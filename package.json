@@ -1,0 +1,31 @@
+{
+  "name": "pocket-pet",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A little desktop companion",
+  "author": "Pocket Pet contributors",
+  "main": "desktop/main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "package": "electron-builder"
+  },
+  "devDependencies": {
+    "electron": "^45.0.0",
+    "electron-builder": "^26.0.0"
+  },
+  "build": {
+    "appId": "com.pocketpet.desktop",
+    "productName": "Pocket Pet",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "desktop/**",
+      "frontend/dist/**",
+      "package.json"
+    ],
+    "mac": {
+      "category": "public.app-category.entertainment"
+    }
+  }
+}
