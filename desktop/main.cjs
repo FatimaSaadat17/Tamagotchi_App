@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, screen } = require('electron');
 const { existsSync } = require('node:fs');
 const path = require('node:path');
 
@@ -28,7 +28,19 @@ ipcMain.handle('pet:chat', (_, message) => {
 });
 
 function createWindow() {
+  const { workArea } = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
+  const margin = Math.min(16, Math.floor(Math.min(workArea.width, workArea.height) / 4));
+  const width = Math.min(360, workArea.width - 2 * margin);
+  const height = Math.min(530, workArea.height - 2 * margin);
+
   const window = new BrowserWindow({
+    width,
+    height,
+    x: workArea.x + workArea.width - width - margin,
+    y: workArea.y + workArea.height - height - margin,
+    minWidth: Math.min(330, width),
+    minHeight: Math.min(420, height),
+    backgroundColor: '#788334',
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,

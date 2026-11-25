@@ -31,11 +31,22 @@ The Docker volume preserves sign-in across container restarts. For local inferen
 
 Stop Spring Boot with Ctrl+C and stop the container with `docker compose down`. To run both services in Docker instead, run `docker compose up --build --wait` after stopping Maven. For that mode, set `OLLAMA_MODEL` in a root `.env` file to change models.
 
-## Run the blank Electron shell
+## Run the Tamagotchi frontend
+
+The React frontend includes Focus, Diary, Calendar, To-do List, AI Day Schedule, and Edit Event. It saves pet care, tasks, diary entries, goals, and events locally. The chat and day schedule use local demo logic.
 
 ```sh
 npm ci
+npm run dev
+```
+
+To launch the desktop app from the project directory:
+
+```sh
+npm run build
 npm start
 ```
 
-Electron opens a blank window. If you add a frontend later, Electron looks for its built entry point at `frontend/dist/index.html`.
+`npm run package` builds the frontend and packages the desktop app.
+
+Electron opens a compact, resizable Focus window at the bottom-right of the display where your pointer is located.
