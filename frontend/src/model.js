@@ -25,6 +25,22 @@ export const timeLabel = (minutes) => [Math.floor(minutes / 60), minutes % 60]
   .map((part) => String(part).padStart(2, '0')).join(':');
 export const sessionsLeft = (task) => Math.max(0, Math.ceil(task.minutes / focusBlock) - task.sessions);
 const storageKey = 'tamagotchi-figma-v1';
+const hungerInterval = 2 * 60 * 60 * 1000;
+
+export function updateHunger(pet, now = Date.now()) {
+  if (!Number.isFinite(pet.hungerAt)) return { ...pet, hungerAt: now, sick: pet.sick ?? pet.food === 0 };
+  const elapsed = Math.floor((now - pet.hungerAt) / hungerInterval);
+  if (elapsed < 1 || pet.food === 0) return pet;
+
+  const food = Math.max(0, pet.food - elapsed);
+  return {
+    ...pet,
+    food,
+    hungerAt: pet.hungerAt + elapsed * hungerInterval,
+    sick: pet.sick || food === 0,
+    health: food === 0 ? Math.min(pet.health, 3) : pet.health,
+  };
+}
 
 const seed = {
   pet: { health: 5, food: 3, happiness: 4, apples: 1 },
@@ -53,12 +69,13 @@ const seed = {
 export function readData() {
   try {
     const data = { ...seed, ...JSON.parse(localStorage.getItem(storageKey)) };
+    data.pet = updateHunger(data.pet);
     if (data.rollover) {
       data.tasks = data.tasks.map((task) => !task.done && task.date < today ? { ...task, date: today, carried: true } : task);
     }
     return data;
   } catch {
-    return seed;
+    return { ...seed, pet: updateHunger(seed.pet) };
   }
 }
 

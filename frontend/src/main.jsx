@@ -6,7 +6,7 @@ import { Calendar, EventEditor } from './Calendar';
 import Diary from './Diary';
 import Focus from './Focus';
 import Plan from './Plan';
-import { comparePriority, focusBlock, offsetDate, readData, saveData, sessionsLeft, today } from './model';
+import { comparePriority, focusBlock, offsetDate, readData, saveData, sessionsLeft, today, updateHunger } from './model';
 import { Avatar } from './ui';
 import './style.css';
 
@@ -58,6 +58,7 @@ function App() {
   const [pickedTask, setPickedTask] = useState(null);
   const [timer, setTimer] = useState(newTimer);
   const [petMessage, setPetMessage] = useState('Your tasks help me grow!');
+  const [reaction, setReaction] = useState(null);
   const focusable = data.tasks.filter((task) => task.date === today && !task.done && sessionsLeft(task) > 0).sort(comparePriority);
   const nextTask = data.tasks.find((task) => task.id === timer.taskId)
     ?? data.tasks.find((task) => task.id === pickedTask && !task.done && sessionsLeft(task) > 0)
@@ -65,6 +66,22 @@ function App() {
   const pending = data.tasks.filter((task) => task.date === planDate && !task.done).reduce((sum, task) => sum + sessionsLeft(task), 0);
 
   useEffect(() => { saveData(data); }, [data]);
+
+  useEffect(() => {
+    const interval = setInterval(() => setData((current) => {
+      const pet = updateHunger(current.pet);
+      return pet === current.pet ? current : { ...current, pet };
+    }), 60_000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    if (!reaction) return;
+    const timeout = setTimeout(() => {
+      setReaction(reaction.name === 'yuck' ? { name: 'cry' } : null);
+    }, reaction.name === 'yuck' ? 640 : 1920);
+    return () => clearTimeout(timeout);
+  }, [reaction]);
 
   const { deadline, taskId, running } = timer;
   useEffect(() => {
@@ -98,22 +115,45 @@ function App() {
   }
 
   function care(action) {
+    if (action === 'Feed' && data.pet.food === 5) {
+      setPetMessage('No! I’m full.');
+      setReaction({ name: 'no' });
+      return;
+    }
     if (action === 'Feed' && !data.pet.apples) {
       setPetMessage('Finish a focus session to earn an apple.');
       return;
     }
-    if (action === 'Feed' && data.pet.food === 5) {
-      setPetMessage('I’m full. Let’s save that apple for later!');
+    if (action === 'Inject') {
+      setData((current) => current.pet.sick
+        ? { ...current, pet: { ...current.pet, sick: false, health: 5 } }
+        : current);
+      setPetMessage('It’s over now, Pochita.');
+      setReaction({ name: 'yuck' });
       return;
     }
-    const stat = { Play: 'happiness', Feed: 'food', Clean: 'health', Rest: 'health' }[action];
+    setReaction(null);
+    if (action === 'Feed') {
+      const hungerAt = Date.now();
+      setData((current) => ({
+        ...current, pet: { ...current.pet, food: current.pet.food + 1, apples: current.pet.apples - 1, hungerAt },
+      }));
+      setPetMessage('Yum! Thank you for the apple.');
+    } else if (data.pet.sick) {
+      setPetMessage('I still feel sick. I need my medicine.');
+    } else {
+      setData((current) => ({
+        ...current, pet: { ...current.pet, health: Math.min(5, current.pet.health + 1) },
+      }));
+      setPetMessage('I feel rested.');
+    }
+  }
+
+  function rewardGame() {
     setData((current) => ({
-      ...current, pet: {
-        ...current.pet, [stat]: Math.min(5, current.pet[stat] + 1),
-        apples: current.pet.apples - Number(action === 'Feed'),
-      },
+      ...current, pet: { ...current.pet, happiness: Math.min(5, current.pet.happiness + 1) },
     }));
-    setPetMessage({ Play: 'That was fun!', Feed: 'Yum! Thank you for the apple.', Clean: 'All clean!', Rest: 'I feel rested.' }[action]);
+    setPetMessage('That was fun! Let’s play again sometime.');
   }
 
   function openEvent(item) {
@@ -135,7 +175,11 @@ function App() {
   return <main className="app"><div className="layout">
     <nav aria-label="Main navigation">{tabs.map((tab) => <button key={tab} aria-pressed={screen === tab}
       onClick={() => { setScreen(tab); setEvent(null); }}>{tab}</button>)}</nav>
-    {screen === 'Focus' && <Focus pet={data.pet} task={nextTask} timer={timer} message={petMessage} onCare={care}
+    {data.pet.sick && <div className="sickness-alert row" role="alert">
+      <span>Pochita is sick and needs an injection.</span>
+      {screen !== 'Focus' && <button className="yellow" onClick={() => { setScreen('Focus'); setEvent(null); }}>Go to Focus</button>}
+    </div>}
+    {screen === 'Focus' && <Focus pet={data.pet} task={nextTask} timer={timer} message={petMessage} reaction={reaction?.name} onCare={care} onGameWin={rewardGame}
       onStart={start} onPause={() => setTimer((current) => ({ ...current, running: false, seconds: Math.max(1, Math.ceil((current.deadline - Date.now()) / 1000)) }))}
       onViewPlan={() => { setPlanDate(nextTask?.date ?? today); setMode('list'); setScreen('Plan'); }} />}
     {screen === 'Diary' && <Diary date={diaryDate} onDate={setDiaryDate} entries={data.entries} goals={data.goals} onGoal={saveGoal}

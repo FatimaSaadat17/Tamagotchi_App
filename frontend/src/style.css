@@ -141,7 +141,45 @@ h3 { color: var(--red); font-size: .75em; text-transform: uppercase; }
 .scene-tv { width: 98.9cqw; left: .98cqw; top: -16.9cqw; }
 .scene-room { width: 72.7cqw; height: 52.9cqw; left: 14.9cqw; top: 9.4cqw; overflow: hidden; }
 .scene-room img { position: absolute; max-width: none; width: 129.05%; height: 100%; left: -12.2%; }
-.sprite { width: 23.85cqw; height: 24.1cqw; left: 37.9cqw; top: 26.3cqw; object-fit: cover; image-rendering: pixelated; }
+.sprite {
+  width: 23.85cqw;
+  height: 24.1cqw;
+  left: 37.9cqw;
+  top: 26.3cqw;
+  image-rendering: pixelated;
+}
+.sprite-patrol { animation: pet-patrol 7.68s linear infinite; }
+.sprite-frames { position: absolute; inset: 0; }
+.sprite-walk { animation: pet-turn 7.68s steps(1, end) infinite; }
+.sprite-frame {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  translate: -50% 0;
+  animation: pet-step 640ms steps(1, end) infinite;
+}
+.sprite-idle { display: none; width: 100%; }
+.sprite-frames:not(.sprite-walk) img { width: 100%; height: 100%; object-fit: contain; object-position: bottom; }
+.sprite[data-mood=sick] .sprite-frame { animation-duration: 1280ms; }
+@keyframes pet-patrol {
+  0%, 100% { translate: 15cqw 0; }
+  50% { translate: -15cqw 0; }
+}
+@keyframes pet-turn {
+  0%, 100% { scale: 1 1; }
+  50% { scale: -1 1; }
+}
+@keyframes pet-step {
+  0% { visibility: visible; }
+  25%, 100% { visibility: hidden; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sprite { animation: none; }
+  .sprite-walk { display: none; }
+  .sprite-patrol .sprite-idle { display: block; }
+  .sprite-frame { animation: none; }
+  .sprite-frame:not(:first-child) { display: none; }
+}
 .pet-status, .pet-message, .care { position: absolute; }
 .pet-status {
   background: var(--cream);
@@ -158,6 +196,42 @@ h3 { color: var(--red); font-size: .75em; text-transform: uppercase; }
 .care button { width: 7.72cqw; height: 6.17cqw; padding: 0; min-height: 0; box-shadow: 0 .43cqw var(--ink); display: grid; place-items: center; background: var(--cream); }
 .care button.yellow { background: var(--yellow); }
 .care .icon { width: 4.24cqw; }
+.care-symbol { font-family: "Apple Color Emoji", "Segoe UI Emoji", sans-serif; font-size: clamp(12px, 3.6cqw, 26px); }
+.sickness-alert { margin-bottom: -1.25cqw; padding: .35em .55em; background: var(--cream); border: 2px solid var(--red); color: var(--red); }
+.direction-game {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.direction-game:focus-visible { outline: none; }
+.direction-game button { pointer-events: auto; }
+.direction-heading { justify-content: space-around; }
+.direction-heading button { padding: 0 .25em; line-height: 1; }
+.direction-sprite { object-fit: contain; object-position: bottom; }
+.direction-controls {
+  position: absolute;
+  top: 50.5cqw;
+  left: 24cqw;
+  width: 52.5cqw;
+  display: grid;
+  justify-items: center;
+  gap: .55cqw;
+  text-align: center;
+}
+.direction-result {
+  padding: 0 .4em;
+  border: 1px solid var(--ink);
+  background: var(--cream);
+  font-size: .75em;
+}
+.direction-buttons { display: flex; gap: 3cqw; }
+.direction-buttons button {
+  width: max(30px, 8cqw);
+  height: max(23px, 5.9cqw);
+  padding: 0;
+  font: 700 clamp(15px, 3.25cqw, 23px)/1 system-ui, sans-serif;
+}
+.direction-next { min-height: max(23px, 5.7cqw); font-size: .8em; }
 .focus-progress { width: 80%; justify-self: center; margin-left: 4.4cqw; padding: 1.45cqw 1.8cqw 2cqw; box-shadow: 0 .75cqw var(--ink); }
 .focus-progress > .row { font-size: .85em; color: var(--red); text-transform: uppercase; margin-bottom: 1.45cqw; }
 .focus-progress .segments { border: max(2px, .43cqw) solid var(--ink); padding: .4cqw; gap: .25cqw; }

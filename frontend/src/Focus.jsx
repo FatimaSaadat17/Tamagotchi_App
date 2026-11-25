@@ -1,16 +1,29 @@
+import { useEffect, useRef, useState } from 'react';
 import { focusBlock, sessionsLeft } from './model';
-import { apple, Apples, art, broom, face, Icon, Segments } from './ui';
+import { apple, Apples, art, face, Icon, Segments } from './ui';
+import DirectionGame from './DirectionGame';
+import WalkingPet from './WalkingPet';
 
 const careActions = [
   { label: 'Play', pieces: [['Controller', '25% 10%']] },
   { label: 'Feed', pieces: apple },
-  { label: 'Clean', pieces: broom },
+  { label: 'Inject', symbol: '💉' },
   { label: 'Rest', pieces: [['PixelCrescent', '10%']] },
 ];
 
-export default function Focus({ pet, task, timer, message, onCare, onStart, onPause, onViewPlan }) {
+export default function Focus({ pet, task, timer, message, reaction, onCare, onGameWin, onStart, onPause, onViewPlan }) {
+  const [playing, setPlaying] = useState(false);
+  const playButton = useRef(null);
+  const restoreFocus = useRef(false);
   const seconds = timer.seconds;
   const clock = [Math.floor(seconds / 60), seconds % 60].map((part) => String(part).padStart(2, '0')).join(':');
+
+  useEffect(() => {
+    if (!playing && restoreFocus.current) {
+      playButton.current.focus({ preventScroll: true });
+      restoreFocus.current = false;
+    }
+  }, [playing]);
 
   return <section className="focus" aria-label="Focus room">
     <div className="scene">
@@ -21,13 +34,16 @@ export default function Focus({ pet, task, timer, message, onCare, onStart, onPa
         <div className="green"><Icon pieces={apple} /><Segments label="Fullness" count={5} filled={pet.food} /></div>
         <div><Icon pieces={face} /><Segments label="Happiness" count={5} filled={pet.happiness} /></div>
       </div>
-      <p className="pet-message" role="status">{message}</p>
-      <img className="sprite" src={art('Standing1')} alt="A white pixel pet" />
-      <div className="care">{careActions.map(({ label, pieces }) =>
-        <button key={label} className={label === 'Play' ? 'yellow' : ''} aria-label={label} title={label} onClick={() => onCare(label)}>
-          <Icon pieces={pieces} />
-        </button>
-      )}</div>
+      {playing ? <DirectionGame onClose={() => { restoreFocus.current = true; setPlaying(false); }} onWin={onGameWin} /> : <>
+        <p className="pet-message" role="status">{reaction === 'yuck' ? 'Yuck!' : reaction === 'cry' ? 'Waaah!' : message}</p>
+        <WalkingPet mood={reaction || (pet.sick ? 'sick' : 'walk')} />
+        <div className="care">{careActions.map(({ label, pieces, symbol }) =>
+          <button key={label} ref={label === 'Play' ? playButton : undefined} className={label === 'Play' ? 'yellow' : ''} aria-label={label} title={label}
+            onClick={() => label === 'Play' ? setPlaying(true) : onCare(label)}>
+            {symbol ? <span className="care-symbol" aria-hidden="true">{symbol}</span> : <Icon pieces={pieces} />}
+          </button>
+        )}</div>
+      </>}
     </div>
     <div className="focus-progress">
       <div className="row"><span>FOCUS · {timer.title || 'DRAFT'}</span><span aria-label="Focus time remaining">{clock}</span></div>

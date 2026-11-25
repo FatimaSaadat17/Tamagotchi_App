@@ -14,7 +14,7 @@ async function callBackend(route, payload) {
       signal: AbortSignal.timeout(65000),
     });
     if (response.ok) return await response.json();
-    return { error: 'Mochi couldn’t reply. Check that Ollama is running and signed in.' };
+    return { error: 'Pochita couldn’t reply. Check that Ollama is running and signed in.' };
   } catch {
     return { error: 'Start the backend with Docker Compose and try again.' };
   }
