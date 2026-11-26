@@ -75,11 +75,11 @@ Stop Spring Boot with Ctrl+C and stop the container with `docker compose down`. 
 | Pet | Read `GET /api/pet`. Send `POST /api/pet/actions` with `action` set to `FEED`, `INJECT`, `REST`, or `PLAY`. |
 | Focus | List or start at `/api/focus-sessions`. Start with `plannedMinutes` (1–60) and an optional `taskId`. Read at `/api/focus-sessions/{id}` or POST to its `/complete` or `/cancel` route. Completion after the planned time awards one apple. |
 | Chat | List or create at `/api/chat/threads`. Read, rename, or delete at `/api/chat/threads/{id}`. GET its `/messages` route for history or POST with `message` to save a conversation turn through Ollama. |
-| AI day planner | `POST /api/day-plans/suggest` proposes task and break times around fixed events with the configured Ollama model. The app sends the selected date, working hours, remaining tasks, fixed events, and any planning preference. Spring Boot checks the proposed times before returning them. |
+| AI day planner | `POST /api/day-plans/suggest` proposes task and break times around fixed events with the configured Ollama model. The app sends the selected date, working hours, remaining tasks, fixed events, any planning preference, and `focusMinutes` (1–60). Spring Boot checks the proposed times and returns individual focus sessions. |
 
 ## Run the Tamagotchi frontend
 
-The React frontend includes Focus, Diary, Calendar, To-do List, AI Day Schedule, and Edit Event. It saves pet care, tasks, diary entries, goals, events, and accepted day plans locally. **Plan my day** uses the Spring Boot API and the configured Ollama model. Type a planning preference in the Day Plan dock to generate a revised plan. The regular chat dock sends messages to Ollama through Spring Boot and saves exchanges in PostgreSQL. Use **Chat history** to review the conversation.
+The React frontend includes Focus, Diary, Calendar, To-do List, AI Day Schedule, and Edit Event. It saves pet care, tasks, diary entries, goals, events, and accepted day plans locally. Type a Pomodoro length from 1 to 60 minutes in Focus or when you select **Plan my day**. The planner uses that length to schedule focus sessions through Spring Boot and Ollama. Type a planning preference in the Day Plan dock to revise a draft. The regular chat dock sends messages to Ollama through Spring Boot and saves exchanges in PostgreSQL. Use **Chat history** to review the conversation.
 
 ```sh
 npm ci

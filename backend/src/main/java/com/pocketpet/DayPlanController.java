@@ -32,7 +32,8 @@ public class DayPlanController {
             @NotNull @Min(1) @Max(1440) Integer end,
             @NotNull @Size(max = 40) List<@NotNull @Valid PlanTask> tasks,
             @NotNull @Size(max = 40) List<@NotNull @Valid FixedEvent> events,
-            @Size(max = 500) String preference) {}
+            @Size(max = 500) String preference,
+            @Min(1) @Max(60) Integer focusMinutes) {}
 
     public record PlanTask(
             @NotBlank @Size(max = 80) String id,

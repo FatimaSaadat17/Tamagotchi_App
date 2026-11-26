@@ -1,6 +1,6 @@
 import { minutesLeft, timeValue } from './model';
 
-export function dayPlanInput(date, tasks, events, hours, preference) {
+export function dayPlanInput(date, tasks, events, hours) {
   return {
     date,
     start: timeValue(hours.start),
@@ -18,7 +18,6 @@ export function dayPlanInput(date, tasks, events, hours, preference) {
       from: timeValue(event.start),
       to: timeValue(event.end),
     })),
-    preference,
   };
 }
 
@@ -39,7 +38,7 @@ export async function suggestDayPlan(input, signal) {
 
 export function planError(status) {
   if (status === 402) return 'Ollama Cloud needs usage credits before Pochita can plan your day.';
-  if (status === 400) return 'Check your hours, task estimates, and event times, then try again.';
+  if (status === 400) return 'Check your Pomodoro length, hours, task estimates, and event times, then try again.';
   if (status === 502) return 'Pochita couldn’t return a valid plan. Check Ollama and try again.';
   return 'Couldn’t reach the planner. Check that the Spring Boot API and Ollama are running, then try again.';
 }

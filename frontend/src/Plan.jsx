@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { dayPlanInput, planError, suggestDayPlan } from './dayPlan';
 import { comparePriority, dateLabel, importance, newId, offsetDate, priorities, sessionsLeft, timeLabel } from './model';
-import { Apples, Avatar, DateNav, Panel } from './ui';
+import { Apples, Avatar, DateNav, FocusDurationInput, Panel, useFocusDuration } from './ui';
 
 function TaskForm({ onAdd }) {
   return <form className="paper task-form" onSubmit={(event) => {
@@ -85,38 +85,36 @@ function HoursEditor({ hours, onSave, onClose }) {
   </form>;
 }
 
-function DayPlan({ tasks, events, hours, focusMinutes, onHours, onEvent, savedPlan, signature, onSave }) {
-  const [initialDraft] = useState(savedPlan);
-  const [draft, setDraft] = useState(initialDraft);
-  const [attempt, setAttempt] = useState(0);
-  const [error, setError] = useState('');
-  const [editingHours, setEditingHours] = useState(false);
-  const input = JSON.parse(signature);
+function DayPlan({ tasks, events, hours, focusMinutes, onFocusMinutes, onHours, onEvent, savedPlan, input, preference, onSave }) {
   const canPlan = input.tasks.length > 0 || input.events.length > 0;
-  const [loading, setLoading] = useState(!initialDraft && canPlan);
-  const pending = tasks.filter((task) => !task.done && sessionsLeft(task, focusMinutes) > 0);
-  const sessions = pending.reduce((total, task) => total + sessionsLeft(task, focusMinutes), 0);
-  const saved = Boolean(draft && draft === savedPlan);
+  const signatureFor = (minutes) => JSON.stringify({ ...input, preference, focusMinutes: minutes });
+  const savedDraft = savedPlan?.signature === signatureFor(savedPlan?.focusMinutes) ? savedPlan.draft : null;
+  const [confirmed, setConfirmed] = useState(() => savedDraft && savedPlan.focusMinutes === focusMinutes
+    ? { minutes: focusMinutes, reuseSaved: true } : null);
+  const [result, setResult] = useState(null);
+  const [editingHours, setEditingHours] = useState(false);
+  const focusDuration = useFocusDuration(focusMinutes, onFocusMinutes);
+  const signature = signatureFor(confirmed?.minutes);
+  const reuseSaved = Boolean(confirmed?.reuseSaved && savedDraft && savedPlan.signature === signature);
+  const current = result && result.confirmed === confirmed && result.signature === signature ? result : null;
+  const draft = confirmed && !reuseSaved ? current?.plan : savedDraft;
+  const planMinutes = confirmed ? confirmed.minutes : savedPlan?.focusMinutes;
+  const sessionMinutes = draft ? planMinutes ?? focusMinutes : focusMinutes;
+  const durationChanged = Boolean(confirmed && confirmed.minutes !== focusDuration.minutes);
+  const loading = Boolean(confirmed && !durationChanged && !reuseSaved && !current);
+  const error = !durationChanged && !reuseSaved && current && !current.plan ? planError(current.status) : '';
+  const pending = tasks.filter((task) => !task.done && sessionsLeft(task, sessionMinutes) > 0);
+  const sessions = pending.reduce((total, task) => total + sessionsLeft(task, sessionMinutes), 0);
+  const saved = Boolean(draft && draft === savedDraft);
 
   useEffect(() => {
-    const request = JSON.parse(signature);
-    if ((!request.tasks.length && !request.events.length) || (attempt === 0 && initialDraft)) return;
-
+    if (!loading) return;
     const controller = new AbortController();
-    suggestDayPlan(request, controller.signal).then(({ plan, status }) => {
-      if (controller.signal.aborted) return;
-      if (plan) setDraft(plan);
-      else setError(planError(status));
-      setLoading(false);
+    suggestDayPlan(JSON.parse(signature), controller.signal).then((response) => {
+      if (!controller.signal.aborted) setResult({ ...response, confirmed, signature });
     });
     return () => controller.abort();
-  }, [signature, attempt, initialDraft]);
-
-  function regenerate() {
-    setError('');
-    setLoading(true);
-    setAttempt((value) => value + 1);
-  }
+  }, [signature, confirmed, loading]);
 
   const rows = draft?.blocks.map((block, index) => {
     const item = block.type === 'TASK' ? tasks.find((task) => String(task.id) === block.itemId)
@@ -134,7 +132,17 @@ function DayPlan({ tasks, events, hours, focusMinutes, onHours, onEvent, savedPl
     <div className="callout schedule-intro"><Avatar /><div><strong>Your day, gently sorted.</strong>
       {highlights.length > 0 ? <ul className="schedule-highlights">{highlights.map((highlight, index) =>
         <li key={index}>{highlight}</li>)}</ul> : <p>Pochita plans your tasks around your fixed events.</p>}
-      <small>1 apple per session · Up to {focusMinutes}m</small></div></div>
+      {draft && planMinutes && <small>1 apple per session · Up to {planMinutes}m</small>}</div></div>
+    {canPlan && <form className="paper pomodoro-prompt" onSubmit={(event) => {
+      event.preventDefault();
+      if (focusDuration.minutes === null || loading) return;
+      focusDuration.commit();
+      setConfirmed({ minutes: focusDuration.minutes });
+    }}>
+      <label htmlFor="plan-focus-duration">How long should each Pomodoro be?</label>
+      <FocusDurationInput id="plan-focus-duration" field={focusDuration} disabled={loading} />
+      <button className="yellow" disabled={loading || focusDuration.minutes === null}>{draft && planMinutes === focusDuration.minutes ? 'Regenerate' : 'Generate plan'}</button>
+    </form>}
     <div className="row section-label schedule-label"><h2>TODAY · {hours.start}–{hours.end}</h2>
       <button className="text-button" aria-expanded={editingHours} onClick={() => setEditingHours(!editingHours)}>Edit hours ›</button></div>
     {editingHours && <HoursEditor hours={hours} onSave={onHours} onClose={() => setEditingHours(false)} />}
@@ -145,32 +153,31 @@ function DayPlan({ tasks, events, hours, focusMinutes, onHours, onEvent, savedPl
         <time>{timeLabel(row.from)}–{timeLabel(row.to)}</time>
         <div><strong>{row.title}</strong><small>{
           row.type === 'event' ? 'Calendar event · Fixed time' : row.type === 'break' ? 'A little break, just for you'
-            : row.priority + ' priority · ' + row.importance
+            : (planMinutes ? (row.to - row.from) + 'm focus · ' : '') + row.priority + ' priority · ' + row.importance
         }</small></div>
-        {row.type === 'task' && <Apples count={sessionsLeft(row, focusMinutes)} />}
+        {row.type === 'task' && <Apples count={planMinutes ? 1 : sessionsLeft(row, sessionMinutes)} />}
         {row.type === 'event' && <button className="text-button" onClick={() => onEvent(row)}>View in Calendar</button>}
         {row.type === 'break' && <small>{row.to - row.from}m</small>}
       </div>)}
       {!canPlan && <p className="paper empty">Add an open task or an event to plan this day.</p>}
     </div>
     <div className="schedule-summary" role="status"><p>{pending.length} open items · {sessions} sessions left{saved ? ' · Plan saved' : ''}</p>
-      {draft && <small>{unscheduledNames.length ? 'Unscheduled: ' + unscheduledNames.join(', ') : 'Calendar times stay fixed.'}</small>}</div>
-    <div className="segmented"><button disabled={loading || !canPlan} onClick={regenerate}>Regenerate</button>
-      <button className="yellow" disabled={loading || !draft || saved}
-        onClick={() => onSave({ signature, draft, preference: input.preference })}>Use this plan</button></div>
+      {draft && <small>{unscheduledNames.length ? 'Unscheduled work: ' + unscheduledNames.join(', ') : 'Calendar times stay fixed.'}</small>}</div>
+    {draft && <div className="segmented"><button className="yellow" disabled={saved || planMinutes !== focusDuration.minutes}
+      onClick={() => onSave({ signature, draft, preference, focusMinutes: planMinutes })}>Use this plan</button></div>}
   </>;
 }
 
 export default function Plan({ date, onDate, mode, onMode, tasks, events, plan, preference, ...actions }) {
   const daily = tasks.filter((item) => item.date === date);
   const calendar = events.filter((item) => item.date === date);
-  const signature = mode === 'plan' ? JSON.stringify(dayPlanInput(date, daily, calendar, actions.hours, preference)) : '';
+  const input = mode === 'plan' ? dayPlanInput(date, daily, calendar, actions.hours) : null;
   return <Panel title="My plan" action={<span>{mode === 'plan' ? 'AI DRAFT' : daily.filter((item) => item.done).length + ' / ' + (daily.length + calendar.length) + ' done'}</span>}>
     <DateNav label={dateLabel(date)} previous={() => onDate(offsetDate(date, -1))} next={() => onDate(offsetDate(date, 1))} />
     <div className="segmented">{[['list', 'To-do list'], ['plan', 'Day plan']].map(([key, name]) =>
       <button key={key} aria-pressed={key === mode} onClick={() => onMode(key)}>{name}</button>)}</div>
     {mode === 'list' ? <Checklist key={date} tasks={daily} events={calendar} {...actions} />
-      : <DayPlan key={signature} tasks={daily} events={calendar} signature={signature}
-        savedPlan={plan?.signature === signature ? plan.draft : null} {...actions} />}
+      : <DayPlan key={JSON.stringify(input)} tasks={daily} events={calendar} input={input}
+        savedPlan={plan} preference={preference} {...actions} />}
   </Panel>;
 }

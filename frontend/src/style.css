@@ -247,9 +247,18 @@ h3 { color: var(--red); font-size: .75em; text-transform: uppercase; }
 }
 .direction-next { min-height: max(23px, 5.7cqw); font-size: .8em; }
 .focus-progress { width: 80%; justify-self: center; margin-left: 4.4cqw; padding: 1.45cqw 1.8cqw 2cqw; box-shadow: 0 .75cqw var(--ink); }
-.focus-progress > .row { font-size: .85em; color: var(--red); text-transform: uppercase; margin-bottom: 1.45cqw; }
-.focus-progress > .row > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.focus-progress select { flex: none; width: auto; font-size: .9em; padding: 0 .2em; }
+.focus-duration { display: flex; align-items: center; justify-content: space-between; gap: .6em; margin-bottom: 1.45cqw; }
+.focus-duration > label, .focus-timer-title { font-size: .85em; text-transform: uppercase; }
+.focus-timer-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.focus-clock { color: var(--red); font-size: 1.8em; line-height: 1; white-space: nowrap; }
+.duration-entry { min-width: 0; }
+.duration-entry > small { display: block; max-width: 18ch; margin-top: .2em; color: var(--red); }
+.duration-readout { display: flex; align-items: baseline; gap: .25em; }
+.duration-readout input {
+  width: 2.25em; padding: .05em .15em; font-size: 1.8em; line-height: 1;
+  text-align: center; color: var(--ink); background: var(--cream); border-width: 0 0 2px;
+}
+.duration-readout > span { color: var(--muted); font-size: .78em; }
 .focus-progress .segments { border: max(2px, .43cqw) solid var(--ink); padding: .4cqw; gap: .25cqw; }
 .focus-progress .segments i { height: 4.05cqw; }
 .next-task { display: grid; grid-template-columns: 1.35fr 1fr; gap: 1.2cqw; padding: .5cqw 1.35cqw; }
@@ -320,6 +329,10 @@ select.plain-select { width: auto; padding: 0; font-size: .85em; }
 .schedule-summary { margin: 1.9cqw 0 .8cqw; color: #626d2d; font-size: .86em; }
 .hours-editor { display: flex; flex-wrap: wrap; align-items: end; gap: .35em; padding: .4em; margin-bottom: .45em; }
 .hours-editor label { flex: 1; }
+.pomodoro-prompt { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: .35em; padding: .5em; margin-top: .5em; }
+.pomodoro-prompt label { grid-column: 1 / -1; }
+.pomodoro-prompt button, .focus-actions > button { align-self: center; }
+.pomodoro-prompt button:disabled, .focus-actions > button:disabled { opacity: .6; cursor: default; }
 .empty { padding: .65em; }
 
 .calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: .55cqw; }

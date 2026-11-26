@@ -36,7 +36,7 @@ function ChatDock({ screen, planning, onPlan, onPlanPreference, pending, apples,
     if (!message.trim()) return;
     if (onPlanPreference) {
       onPlanPreference(message.trim());
-      setNotice('Preference sent. Check the day plan above.');
+      setNotice('Preference added to your day plan.');
       setMessage('');
       return;
     }
@@ -85,11 +85,11 @@ function App() {
   const [petMessage, setPetMessage] = useState('Your tasks help me grow!');
   const [reaction, setReaction] = useState(null);
   const focusMinutes = data.focusMinutes;
+  const setFocusMinutes = (minutes) => setData((current) => ({ ...current, focusMinutes: minutes }));
   const focusable = data.tasks.filter((task) => task.date === today && !task.done && minutesLeft(task) > 0).sort(comparePriority);
   const nextTask = data.tasks.find((task) => task.id === timer.taskId)
     ?? data.tasks.find((task) => task.id === pickedTask && !task.done && minutesLeft(task) > 0)
     ?? focusable[0];
-  const nextMinutes = nextTask ? Math.min(focusMinutes, minutesLeft(nextTask)) : focusMinutes;
   const pending = data.tasks.filter((task) => task.date === planDate && !task.done)
     .reduce((sum, task) => sum + sessionsLeft(task, focusMinutes), 0);
 
@@ -133,8 +133,8 @@ function App() {
     return () => clearInterval(interval);
   }, [deadline, taskId, running, durationMinutes]);
 
-  function start(task) {
-    const minutes = timer.active ? timer.durationMinutes : nextMinutes;
+  function start(task, duration) {
+    const minutes = timer.active ? timer.durationMinutes : duration;
     const seconds = timer.active ? timer.seconds : minutes * 60;
     setTimer({
       active: true, running: true, durationMinutes: minutes, seconds, deadline: Date.now() + seconds * 1000,
@@ -208,8 +208,8 @@ function App() {
       {screen !== 'Focus' && <button className="yellow" onClick={() => { setScreen('Focus'); setEvent(null); }}>Go to Focus</button>}
     </div>}
     {screen === 'Focus' && <Focus pet={data.pet} task={nextTask} timer={timer} message={petMessage} reaction={reaction?.name} onCare={care} onGameWin={rewardGame}
-      focusMinutes={focusMinutes} nextMinutes={nextMinutes}
-      onFocusMinutes={(minutes) => setData((current) => ({ ...current, focusMinutes: minutes }))}
+      focusMinutes={focusMinutes}
+      onFocusMinutes={setFocusMinutes}
       onStart={start} onPause={() => setTimer((current) => ({ ...current, running: false, seconds: Math.max(1, Math.ceil((current.deadline - Date.now()) / 1000)) }))}
       onViewPlan={() => { setPlanDate(nextTask?.date ?? today); setMode('list'); setScreen('Plan'); }} />}
     {screen === 'Diary' && <Diary date={diaryDate} onDate={setDiaryDate} entries={data.entries} goals={data.goals} onGoal={saveGoal}
@@ -220,6 +220,7 @@ function App() {
       : <Calendar date={calendarDate} onDate={setCalendarDate} events={data.events} entries={data.entries} onEdit={openEvent}
         onDiary={(date) => { setDiaryDate(date); setScreen('Diary'); }} />)}
     {screen === 'Plan' && <Plan date={planDate} onDate={setPlanDate} mode={mode} onMode={setMode} tasks={data.tasks} events={data.events} focusMinutes={focusMinutes}
+      onFocusMinutes={setFocusMinutes}
       rollover={data.rollover} hours={data.hours} plan={data.plans[planDate]} onEvent={openEvent}
       preference={planPreferences[planDate] ?? data.plans[planDate]?.preference ?? ''}
       onAdd={(task) => setData((current) => ({ ...current, tasks: [...current.tasks, { ...task, date: planDate }] }))}

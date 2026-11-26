@@ -1,4 +1,42 @@
+import { useState } from 'react';
+import { maxFocusMinutes } from './model';
+
 const artwork = import.meta.glob('./assets/*', { eager: true, import: 'default', query: '?url' });
+
+function parseFocusMinutes(text) {
+  const minutes = Number(text);
+  return /^[0-9]+$/.test(text) && minutes >= 1 && minutes <= maxFocusMinutes ? minutes : null;
+}
+
+export function useFocusDuration(value, onChange) {
+  const [draft, setDraft] = useState(null);
+  const text = draft ?? String(value);
+  const minutes = parseFocusMinutes(text);
+  return {
+    text, minutes, setDraft,
+    commit() {
+      if (minutes !== null) {
+        if (minutes !== value) onChange(minutes);
+        setDraft(null);
+      }
+    },
+  };
+}
+
+export function FocusDurationInput({ id, field, disabled }) {
+  const invalid = field.minutes === null;
+  return <div className="duration-entry">
+    <div className="duration-readout">
+      <input id={id} type="text" inputMode="numeric" autoComplete="off"
+        aria-label="Focus session duration in minutes" aria-invalid={invalid}
+        aria-describedby={invalid ? id + '-error' : undefined} value={field.text} disabled={disabled}
+        onFocus={(event) => event.currentTarget.select()} onBlur={field.commit}
+        onChange={(event) => field.setDraft(event.target.value)} />
+      <span aria-hidden="true">min</span>
+    </div>
+    {invalid && <small id={id + '-error'} role="status">Enter a whole number from 1 to {maxFocusMinutes}.</small>}
+  </div>;
+}
 
 export function art(name) {
   const format = ['MainBg', 'Standing1', 'TvOutline', 'BgBasketBall'].includes(name) ? 'png' : 'svg';
