@@ -22,6 +22,7 @@
   "build": {
     "appId": "com.pocketpet.desktop",
     "productName": "Pocket Pet",
+    "icon": "frontend/public/tama-egg.svg",
     "directories": {
       "output": "release"
     },
