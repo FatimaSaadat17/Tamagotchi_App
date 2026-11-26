@@ -4,7 +4,11 @@ The project contains an Electron shell, a Java 21 Spring Boot API, and Ollama. T
 
 ## Run the backend with Maven
 
-Install JDK 21 and start Docker. From the project root, stop the containerized backend if it is running on port 8080, then start Ollama:
+Install JDK 21 and start PostgreSQL. For the first Liquibase run, create an empty database such as `tamagotchi_dev`. Set `SPRING_DATASOURCE_URL` to `jdbc:postgresql://127.0.0.1:5432/tamagotchi_dev` and set `SPRING_DATASOURCE_USERNAME` and `SPRING_DATASOURCE_PASSWORD` to your local database credentials in the environment that launches Spring Boot.
+
+Liquibase applies `backend/src/main/resources/db/changelog/db.changelog-master.yaml` on startup and records the migration in `databasechangelog`. Hibernate validates the resulting schema. Use an empty database for this first migration if you already created `tasks` by hand in another database.
+
+Start Docker if you want Ollama chat. From the project root, stop the containerized backend if it is running on port 8080, then start Ollama:
 
 ```sh
 docker compose stop backend
@@ -29,7 +33,7 @@ docker compose exec ollama ollama signin
 
 The Docker volume preserves sign-in across container restarts. For local inference, pull a model with `docker compose exec ollama ollama pull llama3.2:1b`, then run `OLLAMA_MODEL=llama3.2:1b ./mvnw spring-boot:run` from `backend`.
 
-Stop Spring Boot with Ctrl+C and stop the container with `docker compose down`. To run both services in Docker instead, run `docker compose up --build --wait` after stopping Maven. For that mode, set `OLLAMA_MODEL` in a root `.env` file to change models.
+Stop Spring Boot with Ctrl+C and stop the container with `docker compose down`. A containerized backend also needs PostgreSQL connection settings and a database host reachable from inside the container.
 
 ## Run the Tamagotchi frontend
 
