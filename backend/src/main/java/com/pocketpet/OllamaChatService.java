@@ -1,6 +1,7 @@
 package com.pocketpet;
 
 import java.net.http.HttpClient;
+import java.net.http.HttpTimeoutException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -14,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.server.ResponseStatusException;
 
 @Service
@@ -22,27 +24,41 @@ public class OllamaChatService {
             "You are Pochita, a small, affectionate desktop pet. Reply playfully in one or two short sentences.";
 
     private final RestClient ollama;
+    private final RestClient planner;
     private final String model;
 
     OllamaChatService(@Value("${ollama.base-url}") String url, @Value("${ollama.model}") String model) {
         var http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(3)).build();
-        var factory = new JdkClientHttpRequestFactory(http);
-        factory.setReadTimeout(Duration.ofSeconds(60));
-        this.ollama = RestClient.builder().baseUrl(url).requestFactory(factory).build();
+        this.ollama = client(http, url, Duration.ofSeconds(60));
+        this.planner = client(http, url, Duration.ofSeconds(120));
         this.model = model;
     }
 
+    private static RestClient client(HttpClient http, String url, Duration timeout) {
+        var factory = new JdkClientHttpRequestFactory(http);
+        factory.setReadTimeout(timeout);
+        return RestClient.builder().baseUrl(url).requestFactory(factory).build();
+    }
+
     String reply(List<Message> history, String text) {
-        return reply(PERSONALITY, history, text, null);
+        return reply(ollama, PERSONALITY, history, text, null);
     }
 
     String plan(String instructions, String text) {
         // The local Qwen model supports JSON mode. Ollama Cloud accepts the prompt without it.
         String format = model.equals("qwen3:4b-instruct") ? "json" : null;
-        return reply(instructions, List.of(), text, format);
+        try {
+            return reply(planner, instructions, List.of(), text, format);
+        } catch (ResponseStatusException exception) {
+            if (exception.getCause() instanceof ResourceAccessException access
+                    && access.getMostSpecificCause() instanceof HttpTimeoutException) {
+                throw new ResponseStatusException(HttpStatus.GATEWAY_TIMEOUT, "Ollama timed out planning the day", exception);
+            }
+            throw exception;
+        }
     }
 
-    private String reply(String instructions, List<Message> history, String text, String format) {
+    private String reply(RestClient client, String instructions, List<Message> history, String text, String format) {
         List<Message> messages = new ArrayList<>(history.size() + 2);
         messages.add(new Message("system", instructions));
         messages.addAll(history);
@@ -50,7 +66,7 @@ public class OllamaChatService {
         var request = new OllamaRequest(model, false, messages, format);
         OllamaReply response;
         try {
-            response = ollama.post().uri("/api/chat").contentType(MediaType.APPLICATION_JSON)
+            response = client.post().uri("/api/chat").contentType(MediaType.APPLICATION_JSON)
                     .body(request).retrieve().body(OllamaReply.class);
         } catch (RestClientResponseException exception) {
             if (exception.getStatusCode().value() == HttpStatus.PAYMENT_REQUIRED.value()) {

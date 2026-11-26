@@ -28,7 +28,7 @@ export async function suggestDayPlan(input, signal) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(input),
-      signal: AbortSignal.any([signal, AbortSignal.timeout(65000)]),
+      signal: AbortSignal.any([signal, AbortSignal.timeout(125000)]),
     });
     return response.ok ? { plan: await response.json() } : { status: response.status };
   } catch {
@@ -39,6 +39,7 @@ export async function suggestDayPlan(input, signal) {
 export function planError(status) {
   if (status === 402) return 'Ollama Cloud needs usage credits before Pochita can plan your day.';
   if (status === 400) return 'Check your Pomodoro length, hours, task estimates, and event times, then try again.';
-  if (status === 502) return 'Pochita couldn’t return a valid plan. Check Ollama and try again.';
+  if (status === 502) return 'Pochita couldn’t create a plan. Try Generate plan again.';
+  if (status === 504) return 'Ollama took too long to finish the plan. Try generating it again.';
   return 'Couldn’t reach the planner. Check that the Spring Boot API and Ollama are running, then try again.';
 }

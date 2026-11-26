@@ -11,16 +11,14 @@ let quitting = false;
 let backendReady = !managed;
 let startupStatus = 'Starting Pocket Pet…';
 
-async function requestBackend(route, payload) {
+async function requestBackend(route, payload, timeout = 65000) {
   try {
-    const response = await fetch(api + route, payload === undefined ? {
-      signal: AbortSignal.timeout(65000),
-    } : {
+    const options = payload === undefined ? {} : {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(65000),
-    });
+    };
+    const response = await fetch(api + route, { ...options, signal: AbortSignal.timeout(timeout) });
     return response.ok ? { data: await response.json() } : { status: response.status };
   } catch {
     return { status: 503 };
@@ -28,7 +26,7 @@ async function requestBackend(route, payload) {
 }
 
 ipcMain.handle('pet:day-plan', async (_, request) => {
-  const { data, status } = await requestBackend('/api/day-plans/suggest', request);
+  const { data, status } = await requestBackend('/api/day-plans/suggest', request, 125000);
   return data ? { plan: data } : { status };
 });
 
