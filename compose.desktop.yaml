@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:17
+    ports:
+      - target: 5432
+        host_ip: 127.0.0.1
+    environment:
+      POSTGRES_DB: tamagotchi_dev
+      POSTGRES_USER: pocket_pet
+      POSTGRES_PASSWORD: ${POCKET_PET_DB_PASSWORD:?Pocket Pet must set its database password}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "pocket_pet", "-d", "tamagotchi_dev"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  postgres-data:

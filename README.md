@@ -2,6 +2,34 @@
 
 The project contains an Electron shell, a Java 21 Spring Boot API, and Ollama. Chat and day planning default to `qwen3:4b-instruct`, which runs locally in the Ollama container. [Qwen3 4B Instruct](https://ollama.com/library/qwen3:4b-instruct)
 
+## Start the desktop app
+
+Install and initialize Docker Desktop on Windows or macOS. Docker Desktop or Docker Engine with the Compose plugin works on Linux. Run `docker info` once to confirm your account can use Docker. For a source checkout, install Node.js 22 and JDK 21 and run `npm ci` once. Start the full app from the repository root.
+
+```sh
+npm start
+```
+
+The launcher builds the frontend and backend, starts Ollama, and downloads the Qwen model on the first run. It uses Postgres.app when installed on macOS and starts a persistent PostgreSQL container on other systems. Spring Boot applies Liquibase and listens on a free loopback port, so a separate server on port 8080 can keep running. Quitting Pocket Pet stops its Spring Boot process. Docker keeps PostgreSQL and Ollama running and preserves their data across restarts.
+
+For a custom database, set `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, and `SPRING_DATASOURCE_PASSWORD` in the launcher’s environment. On macOS set `POCKET_PET_DATABASE=docker` to use Docker PostgreSQL even when Postgres.app is installed. Set `OLLAMA_BASE_URL` to use an existing Ollama server.
+
+### Build the desktop package
+
+```sh
+npm run package
+```
+
+Run the package command on the target OS and architecture to bundle its Java runtime, Spring Boot JAR, and Electron frontend in `release/`. Docker is the only application dependency on the destination machine.
+
+| Platform | Launch |
+| --- | --- |
+| macOS | Open the DMG, drag **Pocket Pet.app** to Applications, and open it. |
+| Windows | Extract the full ZIP and run **Pocket Pet.exe**. Use Docker Desktop in Linux container mode. |
+| Linux | On Debian or Ubuntu, install the `.deb` and open **Pocket Pet** from the app menu. On distributions that allow Chromium's user namespace sandbox, extract the `.tar.gz` and launch `pocket-pet` from that directory. |
+
+Local packages are for testing and are not signed with a trusted release certificate. The **Desktop packages** GitHub Actions workflow builds native packages for Apple Silicon and Intel Mac, Windows x64, and Linux x64.
+
 ## Run the backend with Maven
 
 Install JDK 21 and start PostgreSQL. For the first Liquibase run, create an empty database such as `tamagotchi_dev`. Set `SPRING_DATASOURCE_URL` to `jdbc:postgresql://127.0.0.1:5432/tamagotchi_dev` and set `SPRING_DATASOURCE_USERNAME` and `SPRING_DATASOURCE_PASSWORD` to your local database credentials in the environment that launches Spring Boot.
@@ -58,13 +86,11 @@ npm ci
 npm run dev
 ```
 
-To launch the desktop app from the project directory:
+To open Electron against a separately started backend on port 8080:
 
 ```sh
 npm run build
-npm start
+npm run start:ui
 ```
-
-`npm run package` builds the frontend and packages the desktop app.
 
 Electron opens a compact, resizable Focus window at the bottom-right of the display where your pointer is located.

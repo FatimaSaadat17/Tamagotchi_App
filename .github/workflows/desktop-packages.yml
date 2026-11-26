@@ -1,0 +1,59 @@
+name: Desktop packages
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/desktop-packages.yml'
+      - 'backend/**'
+      - 'desktop/**'
+      - 'frontend/**'
+      - 'scripts/**'
+      - 'compose*.yaml'
+      - 'package*.json'
+      - 'vite.config.*'
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15
+            platform: mac-arm64
+          - os: macos-15-intel
+            platform: mac-x64
+          - os: windows-2025
+            platform: windows-x64
+          - os: ubuntu-24.04
+            platform: linux-x64
+    runs-on: ${{ matrix.os }}
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - run: npm ci
+      - run: npm run package
+      - run: npm run check:package
+      - uses: actions/upload-artifact@v6
+        with:
+          name: pocket-pet-${{ matrix.platform }}
+          path: |
+            release/*.dmg
+            release/*.zip
+            release/*.deb
+            release/*.tar.gz
+          if-no-files-found: error
+          compression-level: 0

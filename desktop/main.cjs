@@ -1,9 +1,15 @@
-const { app, BrowserWindow, ipcMain, screen } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, screen } = require('electron');
 const { existsSync } = require('node:fs');
 const path = require('node:path');
+const { createManagedBackend } = require('./managed-backend.cjs');
 
 const rendererPath = path.join(__dirname, '../frontend/dist/index.html');
-const api = 'http://127.0.0.1:8080';
+const managed = app.isPackaged || process.argv.includes('--managed');
+let api = 'http://127.0.0.1:8080';
+let runtime;
+let quitting = false;
+let backendReady = !managed;
+let startupStatus = 'Starting Pocket Pet…';
 
 async function requestBackend(route, payload) {
   try {
@@ -75,15 +81,72 @@ function createWindow() {
 
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   window.webContents.on('will-navigate', (event) => event.preventDefault());
-  if (existsSync(rendererPath)) window.loadFile(rendererPath);
+  if (backendReady) {
+    if (existsSync(rendererPath)) void window.loadFile(rendererPath);
+  } else {
+    void window.loadFile(path.join(__dirname, 'startup.html')).then(() => displayStatus(window)).catch(() => {});
+  }
+  return window;
 }
 
-app.whenReady().then(() => {
-  createWindow();
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+function displayStatus(window) {
+  if (window.isDestroyed()) return;
+  return window.webContents.executeJavaScript(
+    'if (document.getElementById("status")) document.getElementById("status").textContent = ' + JSON.stringify(startupStatus),
+  ).catch(() => {});
+}
+
+function showWindow() {
+  const window = BrowserWindow.getAllWindows()[0] ?? createWindow();
+  if (window.isMinimized()) window.restore();
+  window.focus();
+}
+
+async function launch() {
+  showWindow();
+  if (!managed) return;
+
+  runtime = createManagedBackend({
+    packaged: app.isPackaged,
+    resourcesPath: process.resourcesPath,
+    logsPath: app.getPath('logs'),
+    statePath: path.join(app.getPath('appData'), 'Pocket Pet', 'services'),
+    onUnexpectedExit: (error) => dialog.showErrorBox('Pocket Pet backend stopped', error.message + '\n\n' + runtime.logFile),
   });
-});
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit();
-});
+
+  try {
+    api = await runtime.start((status) => {
+      startupStatus = status;
+      console.log(status);
+      for (const window of BrowserWindow.getAllWindows()) void displayStatus(window);
+    });
+    if (quitting) return;
+    backendReady = true;
+    for (const window of BrowserWindow.getAllWindows()) void window.loadFile(rendererPath);
+  } catch (error) {
+    if (quitting) return;
+    console.error(error);
+    const logHint = existsSync(runtime.logFile) ? '\n\nSpring Boot log: ' + runtime.logFile : '';
+    dialog.showErrorBox('Pocket Pet could not start', error.message + logHint);
+    app.quit();
+  }
+}
+
+if (managed && !app.requestSingleInstanceLock()) {
+  app.quit();
+} else {
+  if (managed) {
+    process.on('SIGINT', () => app.quit());
+    process.on('SIGTERM', () => app.quit());
+  }
+  app.on('second-instance', showWindow);
+  app.on('activate', showWindow);
+  app.on('before-quit', () => {
+    quitting = true;
+    runtime?.stop();
+  });
+  app.on('window-all-closed', () => {
+    if (process.platform !== 'darwin') app.quit();
+  });
+  void app.whenReady().then(launch);
+}

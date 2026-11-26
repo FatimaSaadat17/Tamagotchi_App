@@ -4,12 +4,15 @@
   "private": true,
   "description": "A little desktop companion",
   "author": "Pocket Pet contributors",
+  "homepage": "https://github.com/FatimaSaadat17/Tamagotchi_App",
   "main": "desktop/main.cjs",
   "scripts": {
-    "start": "electron .",
-    "package": "npm run build && electron-builder",
+    "start": "npm run build && node scripts/build-backend.cjs && electron . --managed",
+    "package": "npm run build && node scripts/build-backend.cjs --runtime && electron-builder --publish never",
+    "check:package": "node scripts/check-package.cjs",
     "dev": "vite --host 127.0.0.1 --port 5173 --strictPort",
-    "build": "vite build"
+    "build": "vite build",
+    "start:ui": "electron ."
   },
   "devDependencies": {
     "electron": "^45.0.0",
@@ -29,7 +32,29 @@
     ],
     "mac": {
       "category": "public.app-category.entertainment"
-    }
+    },
+    "win": {
+      "target": ["zip"]
+    },
+    "linux": {
+      "target": ["deb", "tar.gz"],
+      "maintainer": "Pocket Pet contributors <FatimaSaadat17@users.noreply.github.com>",
+      "category": "Utility"
+    },
+    "extraResources": [
+      {
+        "from": "backend/target/desktop",
+        "to": "backend"
+      },
+      {
+        "from": "compose.yaml",
+        "to": "compose.yaml"
+      },
+      {
+        "from": "compose.desktop.yaml",
+        "to": "compose.desktop.yaml"
+      }
+    ]
   },
   "dependencies": {
     "@fontsource/pixelify-sans": "^5.3.0",
