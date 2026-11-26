@@ -5,11 +5,27 @@ import { DateNav, Panel, Segments } from './ui';
 function EntryForm({ entry, onSave }) {
   const [draft, setDraft] = useState(entry);
   const [saved, setSaved] = useState(false);
+  const [titleError, setTitleError] = useState(false);
   function change(field, value) {
     setDraft((previous) => ({ ...previous, [field]: value }));
     setSaved(false);
+    if (field === 'title') setTitleError(false);
   }
-  return <form onSubmit={(event) => { event.preventDefault(); onSave(draft); setSaved(true); }}>
+
+  function submit(event) {
+    event.preventDefault();
+    const title = draft.title.trim();
+    if (!title) {
+      setTitleError(true);
+      event.currentTarget.elements.title.focus();
+      return;
+    }
+    onSave({ ...draft, title });
+    setDraft({ ...draft, title });
+    setSaved(true);
+  }
+
+  return <form onSubmit={submit}>
     <div className="row section-label"><h2>TODAY’S MOOD</h2><small>A little check-in with yourself</small></div>
     <div className="moods">{moods.map((mood) =>
       <button type="button" aria-pressed={draft.mood === mood} key={mood} onClick={() => change('mood', mood)}>
@@ -17,7 +33,10 @@ function EntryForm({ entry, onSave }) {
       </button>)}</div>
     <div className="paper entry-form">
       <h2>DAILY ENTRY</h2>
-      <input aria-label="Entry title" placeholder="The little things" value={draft.title} maxLength={120} onChange={(e) => change('title', e.target.value)} />
+      <input name="title" aria-label="Entry title" aria-required="true" aria-invalid={titleError}
+        aria-describedby={titleError ? 'diary-title-error' : undefined}
+        placeholder="The little things" value={draft.title} maxLength={120} onChange={(e) => change('title', e.target.value)} />
+      {titleError && <small id="diary-title-error" role="alert">Give this entry a title before saving.</small>}
       <textarea aria-label="Daily entry" required rows="3" value={draft.body} onChange={(e) => change('body', e.target.value)} />
       <div className="row"><small role="status">{saved ? 'Entry saved.' : 'Keep writing…'}</small><button className="yellow">Save entry</button></div>
     </div>

@@ -2,3 +2,18 @@ databaseChangeLog:
   - include:
       file: 001-create-tasks.sql
       relativeToChangelogFile: true
+  - include:
+      file: 002-create-diary-entries.sql
+      relativeToChangelogFile: true
+  - include:
+      file: 003-create-calendar-and-goals.sql
+      relativeToChangelogFile: true
+  - include:
+      file: 004-create-pet-and-focus-sessions.sql
+      relativeToChangelogFile: true
+  - include:
+      file: 005-create-chat.sql
+      relativeToChangelogFile: true
+  - include:
+      file: 006-adjustable-focus-and-pet-rest.sql
+      relativeToChangelogFile: true

@@ -6,8 +6,9 @@ import { Calendar, EventEditor } from './Calendar';
 import Diary from './Diary';
 import Focus from './Focus';
 import Plan from './Plan';
-import { comparePriority, focusBlock, offsetDate, readData, saveData, sessionsLeft, today, updateHunger } from './model';
+import { comparePriority, focusedMinutes, minutesLeft, offsetDate, readData, saveData, sessionsLeft, today, togglePetRest, updatePet } from './model';
 import { Avatar } from './ui';
+import { usePochitaChat } from './usePochitaChat';
 import './style.css';
 
 const tabs = ['Plan', 'Diary', 'Focus', 'Calendar'];
@@ -18,40 +19,64 @@ const chatLabels = {
   Plan: 'Need a gentler plan?',
   Editor: 'Plans change. That’s okay.',
 };
-const newTimer = { seconds: focusBlock * 60, active: false, running: false, taskId: null, title: '' };
+const newTimer = { active: false, running: false, taskId: null, title: '' };
 
-function ChatDock({ screen, planning, onPlan, pending, apples }) {
+function ChatDock({ screen, planning, onPlan, onPlanPreference, pending, apples, chat }) {
   const [message, setMessage] = useState('');
-  const [reply, setReply] = useState('');
+  const [notice, setNotice] = useState('');
+  const [showHistory, setShowHistory] = useState(false);
 
   if (planning) return <section className="chat-dock plan-dock" aria-label="Planning companion">
     <Avatar /><div><strong>Your AI planning pal</strong><small>{pending} sessions left · {apples} {apples === 1 ? 'apple' : 'apples'} earned</small></div>
     <button className="yellow" onClick={onPlan}>Plan my day</button>
   </section>;
 
-  function send(event) {
+  async function send(event) {
     event.preventDefault();
     if (!message.trim()) return;
-    const work = /plan|work|task|study/i.test(message);
-    setReply(work ? 'Let’s start with one small task. I’ll keep you company!' : 'Thanks for telling me. I’m right here with you.');
-    setMessage('');
+    if (onPlanPreference) {
+      onPlanPreference(message.trim());
+      setNotice('Preference sent. Check the day plan above.');
+      setMessage('');
+      return;
+    }
+    if (await chat.send(message.trim())) setMessage('');
   }
 
-  return <section className="chat-dock" aria-label="Demo chat">
+  const busy = !onPlanPreference && (chat.loading || chat.pending);
+  const latest = chat.messages.at(-1)?.content;
+  const reply = onPlanPreference ? notice : chat.pending ? 'Pochita is thinking…' : chat.loading ? 'Loading chat…' : latest;
+  const error = !onPlanPreference && chat.error;
+  return <section className="chat-dock" aria-label={onPlanPreference ? 'Planning preferences' : 'Chat with Pochita'}>
     <Avatar /><div className="chat-main">
-      <div className="row"><span role="status">{reply || chatLabels[screen]}</span><small title="Local demo responses">AI CHAT</small></div>
-      <form className="chat-form" onSubmit={send}><input aria-label="Message your AI pal" placeholder="Message your AI pal…"
-        value={message} maxLength={500} onChange={(event) => setMessage(event.target.value)} />
-        <button className="yellow">Send</button></form>
+      <div className="row">
+        <span role={error ? 'alert' : 'status'}>{error || (!showHistory && reply) || chatLabels[screen]}</span>
+        {!onPlanPreference && chat.messages.length > 0
+          ? <button type="button" className="text-button chat-history-toggle" aria-expanded={showHistory}
+            onClick={() => setShowHistory(!showHistory)}>{showHistory ? 'Hide chat' : 'Chat history'}</button>
+          : <small>{onPlanPreference ? 'AI PLANNER' : 'AI CHAT'}</small>}
+      </div>
+      {!onPlanPreference && showHistory && <>
+        <ol className="chat-history" aria-label="Conversation">
+          {chat.messages.map((item) => <li key={item.id}><strong>{item.role === 'USER' ? 'You' : 'Pochita'}</strong> {item.content}</li>)}
+        </ol>
+        {busy && <small role="status">{reply}</small>}
+      </>}
+      <form className="chat-form" onSubmit={send}><input aria-label={onPlanPreference ? 'Day plan preference' : 'Message your AI pal'}
+        placeholder={onPlanPreference ? 'Suggest a change to your plan…' : 'Message your AI pal…'}
+        value={message} maxLength={500} readOnly={busy} onChange={(event) => setMessage(event.target.value)} />
+        <button className="yellow" disabled={busy || !message.trim()}>Send</button></form>
     </div>
   </section>;
 }
 
 function App() {
+  const chat = usePochitaChat();
   const [data, setData] = useState(readData);
   const [screen, setScreen] = useState('Focus');
   const [mode, setMode] = useState('list');
   const [planDate, setPlanDate] = useState(today);
+  const [planPreferences, setPlanPreferences] = useState({});
   const [diaryDate, setDiaryDate] = useState(() => Object.keys(data.entries).sort().at(-1) ?? offsetDate(today, -2));
   const [calendarDate, setCalendarDate] = useState(today);
   const [event, setEvent] = useState(null);
@@ -59,19 +84,22 @@ function App() {
   const [timer, setTimer] = useState(newTimer);
   const [petMessage, setPetMessage] = useState('Your tasks help me grow!');
   const [reaction, setReaction] = useState(null);
-  const focusable = data.tasks.filter((task) => task.date === today && !task.done && sessionsLeft(task) > 0).sort(comparePriority);
+  const focusMinutes = data.focusMinutes;
+  const focusable = data.tasks.filter((task) => task.date === today && !task.done && minutesLeft(task) > 0).sort(comparePriority);
   const nextTask = data.tasks.find((task) => task.id === timer.taskId)
-    ?? data.tasks.find((task) => task.id === pickedTask && !task.done && sessionsLeft(task) > 0)
+    ?? data.tasks.find((task) => task.id === pickedTask && !task.done && minutesLeft(task) > 0)
     ?? focusable[0];
-  const pending = data.tasks.filter((task) => task.date === planDate && !task.done).reduce((sum, task) => sum + sessionsLeft(task), 0);
+  const nextMinutes = nextTask ? Math.min(focusMinutes, minutesLeft(nextTask)) : focusMinutes;
+  const pending = data.tasks.filter((task) => task.date === planDate && !task.done)
+    .reduce((sum, task) => sum + sessionsLeft(task, focusMinutes), 0);
 
   useEffect(() => { saveData(data); }, [data]);
 
   useEffect(() => {
     const interval = setInterval(() => setData((current) => {
-      const pet = updateHunger(current.pet);
+      const pet = updatePet(current.pet);
       return pet === current.pet ? current : { ...current, pet };
-    }), 60_000);
+    }), 10_000);
     return () => clearInterval(interval);
   }, []);
 
@@ -83,7 +111,7 @@ function App() {
     return () => clearTimeout(timeout);
   }, [reaction]);
 
-  const { deadline, taskId, running } = timer;
+  const { deadline, taskId, running, durationMinutes } = timer;
   useEffect(() => {
     if (!running) return;
     const interval = setInterval(() => {
@@ -98,17 +126,18 @@ function App() {
       setData((current) => ({
         ...current,
         pet: { ...current.pet, apples: current.pet.apples + 1 },
-        tasks: current.tasks.map((task) => task.id === taskId ? { ...task, sessions: task.sessions + 1 } : task),
+        tasks: current.tasks.map((task) => task.id === taskId
+          ? { ...task, sessions: task.sessions + 1, focusedMinutes: focusedMinutes(task) + durationMinutes } : task),
       }));
     }, 250);
     return () => clearInterval(interval);
-  }, [deadline, taskId, running]);
+  }, [deadline, taskId, running, durationMinutes]);
 
   function start(task) {
-    const minutes = task ? Math.min(focusBlock, task.minutes - task.sessions * focusBlock) : focusBlock;
+    const minutes = timer.active ? timer.durationMinutes : nextMinutes;
     const seconds = timer.active ? timer.seconds : minutes * 60;
     setTimer({
-      active: true, running: true, seconds, deadline: Date.now() + seconds * 1000,
+      active: true, running: true, durationMinutes: minutes, seconds, deadline: Date.now() + seconds * 1000,
       taskId: timer.active ? timer.taskId : task?.id,
       title: timer.active ? timer.title : task?.title,
     });
@@ -142,10 +171,9 @@ function App() {
     } else if (data.pet.sick) {
       setPetMessage('I still feel sick. I need my medicine.');
     } else {
-      setData((current) => ({
-        ...current, pet: { ...current.pet, health: Math.min(5, current.pet.health + 1) },
-      }));
-      setPetMessage('I feel rested.');
+      const now = Date.now();
+      setData((current) => ({ ...current, pet: togglePetRest(current.pet, now) }));
+      setPetMessage('Pochita is ready to play.');
     }
   }
 
@@ -180,6 +208,8 @@ function App() {
       {screen !== 'Focus' && <button className="yellow" onClick={() => { setScreen('Focus'); setEvent(null); }}>Go to Focus</button>}
     </div>}
     {screen === 'Focus' && <Focus pet={data.pet} task={nextTask} timer={timer} message={petMessage} reaction={reaction?.name} onCare={care} onGameWin={rewardGame}
+      focusMinutes={focusMinutes} nextMinutes={nextMinutes}
+      onFocusMinutes={(minutes) => setData((current) => ({ ...current, focusMinutes: minutes }))}
       onStart={start} onPause={() => setTimer((current) => ({ ...current, running: false, seconds: Math.max(1, Math.ceil((current.deadline - Date.now()) / 1000)) }))}
       onViewPlan={() => { setPlanDate(nextTask?.date ?? today); setMode('list'); setScreen('Plan'); }} />}
     {screen === 'Diary' && <Diary date={diaryDate} onDate={setDiaryDate} entries={data.entries} goals={data.goals} onGoal={saveGoal}
@@ -189,8 +219,9 @@ function App() {
         onDelete={(id) => { setData((current) => ({ ...current, events: current.events.filter((item) => item.id !== id) })); setEvent(null); }} />
       : <Calendar date={calendarDate} onDate={setCalendarDate} events={data.events} entries={data.entries} onEdit={openEvent}
         onDiary={(date) => { setDiaryDate(date); setScreen('Diary'); }} />)}
-    {screen === 'Plan' && <Plan date={planDate} onDate={setPlanDate} mode={mode} onMode={setMode} tasks={data.tasks} events={data.events}
+    {screen === 'Plan' && <Plan date={planDate} onDate={setPlanDate} mode={mode} onMode={setMode} tasks={data.tasks} events={data.events} focusMinutes={focusMinutes}
       rollover={data.rollover} hours={data.hours} plan={data.plans[planDate]} onEvent={openEvent}
+      preference={planPreferences[planDate] ?? data.plans[planDate]?.preference ?? ''}
       onAdd={(task) => setData((current) => ({ ...current, tasks: [...current.tasks, { ...task, date: planDate }] }))}
       onToggle={(id) => setData((current) => ({ ...current, tasks: current.tasks.map((item) => item.id === id ? { ...item, done: !item.done } : item) }))}
       onDelete={(id) => setData((current) => ({ ...current, tasks: current.tasks.filter((item) => item.id !== id) }))}
@@ -199,7 +230,9 @@ function App() {
       onHours={(hours) => setData((current) => ({ ...current, hours }))}
       onSave={(plan) => setData((current) => ({ ...current, plans: { ...current.plans, [planDate]: plan } }))} />}
     <ChatDock key={event ? 'Editor' : screen + (screen === 'Plan' ? mode : '')} screen={event ? 'Editor' : screen}
-      planning={screen === 'Plan' && mode === 'list'} onPlan={() => setMode('plan')} pending={pending} apples={data.pet.apples} />
+      planning={screen === 'Plan' && mode === 'list'} onPlan={() => setMode('plan')} pending={pending} apples={data.pet.apples} chat={chat}
+      onPlanPreference={screen === 'Plan' && mode === 'plan'
+        ? (text) => setPlanPreferences((current) => ({ ...current, [planDate]: text })) : undefined} />
   </div></main>;
 }
 

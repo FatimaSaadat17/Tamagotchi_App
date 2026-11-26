@@ -14,6 +14,8 @@ import cry4 from './sprites/cry/cry_4.png';
 import sick1 from './sprites/sick/sick_1.png';
 import sick2 from './sprites/sick/sick_2.png';
 import sick3 from './sprites/sick/sick_3.png';
+import sleep1 from './sprites/sleeping/sleep_1.png';
+import sleep2 from './sprites/sleeping/sleep_2.png';
 
 const walkingWidths = [476, 514, 482, 420];
 const animations = {
@@ -22,6 +24,7 @@ const animations = {
   yuck: [yuck1, yuck2, yuck1, yuck2],
   cry: [cry1, cry2, cry3, cry4],
   sick: [sick1, sick2, sick3, sick2],
+  sleep: [sleep1, sleep2, sleep1, sleep2],
 };
 const description = {
   walk: 'Pochita, the white pixel pet',
@@ -29,11 +32,12 @@ const description = {
   yuck: 'Pochita makes a face',
   cry: 'Pochita is crying',
   sick: 'Pochita looks sick',
+  sleep: 'Pochita is asleep',
 };
 
 export default function WalkingPet({ mood = 'walk' }) {
   const walking = mood === 'walk';
-  const frameDuration = mood === 'sick' ? 320 : 160;
+  const frameDuration = { sick: 320, sleep: 600 }[mood] ?? 160;
   return <div className={'sprite' + (walking ? ' sprite-patrol' : '')} role="img" aria-label={description[mood]} data-mood={mood}>
     <img className="sprite-idle" src={standing} alt="" />
     <div className={'sprite-frames' + (walking ? ' sprite-walk' : '')} key={mood} aria-hidden="true">
@@ -41,6 +45,7 @@ export default function WalkingPet({ mood = 'walk' }) {
         style={{
           width: walking ? (100 * walkingWidths[index] / 462) + '%' : undefined,
           animationDelay: index === 0 ? '0ms' : (index - 4) * frameDuration + 'ms',
+          animationDuration: frameDuration * 4 + 'ms',
         }} />)}
     </div>
   </div>;

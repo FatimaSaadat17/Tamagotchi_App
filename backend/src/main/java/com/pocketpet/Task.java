@@ -21,7 +21,7 @@ public class Task {
     private LocalDate plannedDate;
 
     @Column(name = "estimated_minutes", nullable=false)
-    @Min(0)
+    @Min(1)
     private Integer estimatedMinutes;
 
     @Column(name = "status", nullable=false)

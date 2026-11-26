@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { comparePriority, dateLabel, focusBlock, importance, makeSchedule, newId, offsetDate, priorities, sessionsLeft, timeLabel } from './model';
+import { useEffect, useState } from 'react';
+import { dayPlanInput, planError, suggestDayPlan } from './dayPlan';
+import { comparePriority, dateLabel, importance, newId, offsetDate, priorities, sessionsLeft, timeLabel } from './model';
 import { Apples, Avatar, DateNav, Panel } from './ui';
 
 function TaskForm({ onAdd }) {
@@ -22,29 +23,29 @@ function TaskForm({ onAdd }) {
   </form>;
 }
 
-function TaskRow({ task, onToggle, onDelete, onFocus }) {
+function TaskRow({ task, focusMinutes, onToggle, onDelete, onFocus }) {
   return <div className={'paper task-row ' + (task.done ? 'done' : '')}>
     <input type="checkbox" checked={task.done} aria-label={'Mark ' + task.title + ' complete'} onChange={() => onToggle(task.id)} />
     <div><strong>{task.title}</strong><small>{task.minutes}m · {task.importance}{task.done ? ' · Completed' : task.carried ? ' · From an earlier day' : ''}</small></div>
     <div className="task-reward"><span className={'tag ' + task.priority.toLowerCase()}>{task.priority === 'Medium' ? 'Med' : task.priority}</span>
-      <Apples count={task.done ? Math.max(1, task.sessions) : sessionsLeft(task)} /></div>
+      <Apples count={task.done ? Math.max(1, task.sessions) : sessionsLeft(task, focusMinutes)} /></div>
     <details className="task-menu"><summary aria-label={'Actions for ' + task.title}>…</summary>
       <div>{!task.done && <button onClick={() => onFocus(task)}>Focus on task</button>}<button onClick={() => onDelete(task.id)}>Delete task</button></div>
     </details>
   </div>;
 }
 
-function Checklist({ tasks, events, onAdd, onToggle, onDelete, onFocus, onEvent, rollover, onRollover }) {
+function Checklist({ tasks, events, focusMinutes, onAdd, onToggle, onDelete, onFocus, onEvent, rollover, onRollover }) {
   const [sort, setSort] = useState('priority');
   const [carriedOnly, setCarriedOnly] = useState(false);
   const open = tasks.filter((task) => !task.done).sort(sort === 'priority' ? comparePriority : (a, b) => a.minutes - b.minutes);
   const carried = open.filter((task) => task.carried);
   const shown = carriedOnly ? carried : open;
-  const row = (task) => <TaskRow key={task.id} task={task} onToggle={onToggle} onDelete={onDelete} onFocus={onFocus} />;
+  const row = (task) => <TaskRow key={task.id} task={task} focusMinutes={focusMinutes} onToggle={onToggle} onDelete={onDelete} onFocus={onFocus} />;
 
   return <>
     <TaskForm onAdd={onAdd} />
-    <div className="row section-label plan-label"><h2>TODAY’S TASKS</h2><small className="reward"><Apples count={1} /> = up to {focusBlock}m focus</small>
+    <div className="row section-label plan-label"><h2>TODAY’S TASKS</h2><small className="reward"><Apples count={1} /> = up to {focusMinutes}m focus</small>
       <select className="plain-select" aria-label="Sort tasks" value={sort} onChange={(e) => setSort(e.target.value)}>
         <option value="priority">Priority</option><option value="minutes">Duration</option>
       </select>
@@ -84,49 +85,92 @@ function HoursEditor({ hours, onSave, onClose }) {
   </form>;
 }
 
-function DayPlan({ tasks, events, hours, onHours, onEvent, plan, onSave }) {
-  const [shortFirst, setShortFirst] = useState(plan?.shortFirst ?? false);
+function DayPlan({ tasks, events, hours, focusMinutes, onHours, onEvent, savedPlan, signature, onSave }) {
+  const [initialDraft] = useState(savedPlan);
+  const [draft, setDraft] = useState(initialDraft);
+  const [attempt, setAttempt] = useState(0);
+  const [error, setError] = useState('');
   const [editingHours, setEditingHours] = useState(false);
-  const [saved, setSaved] = useState(Boolean(plan));
-  const { rows, unscheduled } = makeSchedule(tasks, events, hours, shortFirst);
-  const pending = tasks.filter((task) => !task.done);
-  const sessions = pending.reduce((total, task) => total + sessionsLeft(task), 0);
+  const input = JSON.parse(signature);
+  const canPlan = input.tasks.length > 0 || input.events.length > 0;
+  const [loading, setLoading] = useState(!initialDraft && canPlan);
+  const pending = tasks.filter((task) => !task.done && sessionsLeft(task, focusMinutes) > 0);
+  const sessions = pending.reduce((total, task) => total + sessionsLeft(task, focusMinutes), 0);
+  const saved = Boolean(draft && draft === savedPlan);
+
+  useEffect(() => {
+    const request = JSON.parse(signature);
+    if ((!request.tasks.length && !request.events.length) || (attempt === 0 && initialDraft)) return;
+
+    const controller = new AbortController();
+    suggestDayPlan(request, controller.signal).then(({ plan, status }) => {
+      if (controller.signal.aborted) return;
+      if (plan) setDraft(plan);
+      else setError(planError(status));
+      setLoading(false);
+    });
+    return () => controller.abort();
+  }, [signature, attempt, initialDraft]);
+
+  function regenerate() {
+    setError('');
+    setLoading(true);
+    setAttempt((value) => value + 1);
+  }
+
+  const rows = draft?.blocks.map((block, index) => {
+    const item = block.type === 'TASK' ? tasks.find((task) => String(task.id) === block.itemId)
+      : block.type === 'EVENT' ? events.find((event) => String(event.id) === block.itemId) : null;
+    return {
+      ...item, from: block.from, to: block.to, type: block.type.toLowerCase(),
+      key: block.type + '-' + index, title: item?.title ?? 'Take a breather',
+    };
+  }) ?? [];
+  const unscheduled = draft?.unscheduledTaskIds ?? [];
+  const unscheduledNames = pending.filter((task) => unscheduled.includes(String(task.id))).map((task) => task.title);
+  const highlights = draft?.highlights ?? (draft?.summary ? [draft.summary] : []);
 
   return <>
     <div className="callout schedule-intro"><Avatar /><div><strong>Your day, gently sorted.</strong>
-      <p>Important tasks first, around fixed events.<br />Each focus session earns an apple for your pet.</p>
-      <small>1 apple = up to {focusBlock}m · Last session can be shorter</small></div></div>
+      {highlights.length > 0 ? <ul className="schedule-highlights">{highlights.map((highlight, index) =>
+        <li key={index}>{highlight}</li>)}</ul> : <p>Pochita plans your tasks around your fixed events.</p>}
+      <small>1 apple per session · Up to {focusMinutes}m</small></div></div>
     <div className="row section-label schedule-label"><h2>TODAY · {hours.start}–{hours.end}</h2>
       <button className="text-button" aria-expanded={editingHours} onClick={() => setEditingHours(!editingHours)}>Edit hours ›</button></div>
-    {editingHours && <HoursEditor hours={hours} onSave={(next) => { onHours(next); setSaved(false); }} onClose={() => setEditingHours(false)} />}
+    {editingHours && <HoursEditor hours={hours} onSave={onHours} onClose={() => setEditingHours(false)} />}
+    {loading && <p className="paper empty" role="status">Pochita is planning your day…</p>}
+    {error && <p className="paper empty" role="alert">{error}</p>}
     <div className="schedule-list">
-      {rows.map((row) => <div className={'paper schedule-row ' + row.type} key={row.id}>
+      {rows.map((row) => <div className={'paper schedule-row ' + row.type} key={row.key}>
         <time>{timeLabel(row.from)}–{timeLabel(row.to)}</time>
         <div><strong>{row.title}</strong><small>{
           row.type === 'event' ? 'Calendar event · Fixed time' : row.type === 'break' ? 'A little break, just for you'
-            : row.done ? 'Completed · ' + row.sessions + ' pet apple earned' : row.priority + ' priority · ' + row.importance
+            : row.priority + ' priority · ' + row.importance
         }</small></div>
-        {row.type === 'task' && <Apples count={row.done ? row.sessions : sessionsLeft(row)} />}
+        {row.type === 'task' && <Apples count={sessionsLeft(row, focusMinutes)} />}
         {row.type === 'event' && <button className="text-button" onClick={() => onEvent(row)}>View in Calendar</button>}
-        {row.type === 'break' && <small>15m</small>}
+        {row.type === 'break' && <small>{row.to - row.from}m</small>}
       </div>)}
-      {!rows.length && <p className="paper empty">Add tasks or an event to plan this day.</p>}
+      {!canPlan && <p className="paper empty">Add an open task or an event to plan this day.</p>}
     </div>
     <div className="schedule-summary" role="status"><p>{pending.length} open items · {sessions} sessions left{saved ? ' · Plan saved' : ''}</p>
-      <small>{unscheduled ? unscheduled + ' tasks did not fit within your hours.' : 'Calendar times stay fixed.'}</small></div>
-    <div className="segmented"><button onClick={() => { setShortFirst(!shortFirst); setSaved(false); }}>Regenerate</button>
-      <button className="yellow" onClick={() => { onSave({ shortFirst }); setSaved(true); }}>Use this plan</button></div>
+      {draft && <small>{unscheduledNames.length ? 'Unscheduled: ' + unscheduledNames.join(', ') : 'Calendar times stay fixed.'}</small>}</div>
+    <div className="segmented"><button disabled={loading || !canPlan} onClick={regenerate}>Regenerate</button>
+      <button className="yellow" disabled={loading || !draft || saved}
+        onClick={() => onSave({ signature, draft, preference: input.preference })}>Use this plan</button></div>
   </>;
 }
 
-export default function Plan({ date, onDate, mode, onMode, tasks, events, ...actions }) {
+export default function Plan({ date, onDate, mode, onMode, tasks, events, plan, preference, ...actions }) {
   const daily = tasks.filter((item) => item.date === date);
   const calendar = events.filter((item) => item.date === date);
+  const signature = mode === 'plan' ? JSON.stringify(dayPlanInput(date, daily, calendar, actions.hours, preference)) : '';
   return <Panel title="My plan" action={<span>{mode === 'plan' ? 'AI DRAFT' : daily.filter((item) => item.done).length + ' / ' + (daily.length + calendar.length) + ' done'}</span>}>
     <DateNav label={dateLabel(date)} previous={() => onDate(offsetDate(date, -1))} next={() => onDate(offsetDate(date, 1))} />
     <div className="segmented">{[['list', 'To-do list'], ['plan', 'Day plan']].map(([key, name]) =>
       <button key={key} aria-pressed={key === mode} onClick={() => onMode(key)}>{name}</button>)}</div>
     {mode === 'list' ? <Checklist key={date} tasks={daily} events={calendar} {...actions} />
-      : <DayPlan key={date} tasks={daily} events={calendar} {...actions} />}
+      : <DayPlan key={signature} tasks={daily} events={calendar} signature={signature}
+        savedPlan={plan?.signature === signature ? plan.draft : null} {...actions} />}
   </Panel>;
 }

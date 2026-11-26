@@ -1,0 +1,19 @@
+package com.pocketpet;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
+
+import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+
+public interface CalendarEventRepository extends JpaRepository<CalendarEvent, Integer> {
+    List<CalendarEvent> findAllByOrderByStartsAtAscIdAsc();
+
+    List<CalendarEvent> findByStartsAtLessThanAndEndsAtGreaterThanOrderByStartsAtAscIdAsc(
+            Instant endExclusive, Instant startInclusive);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    Optional<CalendarEvent> findEventById(Integer id);
+}

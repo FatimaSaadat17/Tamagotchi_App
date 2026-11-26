@@ -129,6 +129,21 @@ h3 { color: var(--red); font-size: .75em; text-transform: uppercase; }
 .chat-main, .plan-dock > div { flex: 1; min-width: 0; }
 .chat-main > .row { margin-bottom: .45cqw; font-size: .84em; }
 .chat-main > .row small { color: #626d2d; white-space: nowrap; }
+.chat-main > .row span { min-width: 0; overflow-wrap: anywhere; }
+.chat-history-toggle { flex: none; font-size: .85em; }
+.chat-history {
+  max-height: 135px;
+  overflow: auto;
+  margin: .3em 0;
+  padding: .3em .45em;
+  list-style: none;
+  background: var(--paper);
+  border: 1px solid var(--ink);
+  font-size: .9em;
+  overflow-wrap: anywhere;
+}
+.chat-history li + li { margin-top: .3em; }
+.chat-history strong { color: var(--red); }
 .chat-form { display: flex; }
 .chat-form input { flex: 1; border-right: 0; }
 .chat-form button { min-width: 12cqw; }
@@ -160,7 +175,6 @@ h3 { color: var(--red); font-size: .75em; text-transform: uppercase; }
 }
 .sprite-idle { display: none; width: 100%; }
 .sprite-frames:not(.sprite-walk) img { width: 100%; height: 100%; object-fit: contain; object-position: bottom; }
-.sprite[data-mood=sick] .sprite-frame { animation-duration: 1280ms; }
 @keyframes pet-patrol {
   0%, 100% { translate: 15cqw 0; }
   50% { translate: -15cqw 0; }
@@ -234,6 +248,8 @@ h3 { color: var(--red); font-size: .75em; text-transform: uppercase; }
 .direction-next { min-height: max(23px, 5.7cqw); font-size: .8em; }
 .focus-progress { width: 80%; justify-self: center; margin-left: 4.4cqw; padding: 1.45cqw 1.8cqw 2cqw; box-shadow: 0 .75cqw var(--ink); }
 .focus-progress > .row { font-size: .85em; color: var(--red); text-transform: uppercase; margin-bottom: 1.45cqw; }
+.focus-progress > .row > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.focus-progress select { flex: none; width: auto; font-size: .9em; padding: 0 .2em; }
 .focus-progress .segments { border: max(2px, .43cqw) solid var(--ink); padding: .4cqw; gap: .25cqw; }
 .focus-progress .segments i { height: 4.05cqw; }
 .next-task { display: grid; grid-template-columns: 1.35fr 1fr; gap: 1.2cqw; padding: .5cqw 1.35cqw; }
@@ -294,6 +310,7 @@ select.plain-select { width: auto; padding: 0; font-size: .85em; }
 .schedule-intro { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 3cqw; align-items: center; padding: 1.55cqw 2cqw .75cqw; }
 .schedule-intro strong { color: var(--ink); font-size: 1.18em; }
 .schedule-intro p { margin: .25em 0; font-size: .93em; }
+.schedule-highlights { margin: .35em 0; padding-inline-start: 1.1em; font-size: .93em; }
 .schedule-label { margin-top: 2.5cqw; }
 .schedule-row, .agenda-row { display: grid; grid-template-columns: minmax(4.6em, 23%) minmax(0, 1fr) auto; gap: 1.6cqw; align-items: center; padding: .45cqw 1cqw; min-height: 5.9cqw; border-color: #b98766; border-left: .6cqw solid var(--red); }
 .schedule-row time, .agenda-row > :first-child { border-right: 1px solid var(--line); padding: .35em 0; font-size: .8em; }

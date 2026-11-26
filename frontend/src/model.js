@@ -19,15 +19,20 @@ export const importance = ['Important', 'Routine'];
 export const moods = ['Low', 'Meh', 'Okay', 'Good', 'Great'];
 export const emptyEntry = { mood: '', title: '', body: '' };
 export const newId = () => crypto.randomUUID();
-export const focusBlock = 25;
+export const defaultFocusMinutes = 25;
+export const maxFocusMinutes = 60;
 export const timeValue = (time) => Number(time.slice(0, 2)) * 60 + Number(time.slice(3));
 export const timeLabel = (minutes) => [Math.floor(minutes / 60), minutes % 60]
   .map((part) => String(part).padStart(2, '0')).join(':');
-export const sessionsLeft = (task) => Math.max(0, Math.ceil(task.minutes / focusBlock) - task.sessions);
+export const focusedMinutes = (task) => task.focusedMinutes ?? Math.min(task.minutes, task.sessions * defaultFocusMinutes);
+export const minutesLeft = (task) => Math.max(0, task.minutes - focusedMinutes(task));
+export const sessionsLeft = (task, focusMinutes) => Math.ceil(minutesLeft(task) / focusMinutes);
 const storageKey = 'tamagotchi-figma-v1';
 const hungerInterval = 2 * 60 * 60 * 1000;
+const awakeDuration = 4 * 60 * 60 * 1000;
+const napDuration = 20 * 60 * 1000;
 
-export function updateHunger(pet, now = Date.now()) {
+function updateHunger(pet, now) {
   if (!Number.isFinite(pet.hungerAt)) return { ...pet, hungerAt: now, sick: pet.sick ?? pet.food === 0 };
   const elapsed = Math.floor((now - pet.hungerAt) / hungerInterval);
   if (elapsed < 1 || pet.food === 0) return pet;
@@ -42,7 +47,28 @@ export function updateHunger(pet, now = Date.now()) {
   };
 }
 
+export function updatePet(pet, now = Date.now()) {
+  const fed = updateHunger(pet, now);
+  let napAt = Number.isFinite(fed.napAt) ? fed.napAt : now + awakeDuration;
+  let health = fed.health;
+  if (now >= napAt + napDuration) {
+    const naps = 1 + Math.floor((now - napAt - napDuration) / (awakeDuration + napDuration));
+    napAt += naps * (awakeDuration + napDuration);
+    if (!fed.sick) health = Math.min(5, health + naps);
+  }
+  const sleeping = !fed.sick && now >= napAt;
+  return napAt === fed.napAt && health === fed.health && sleeping === fed.sleeping
+    ? fed : { ...fed, napAt, health, sleeping };
+}
+
+export function togglePetRest(pet, now) {
+  const current = updatePet(pet, now);
+  if (current.sick) return current;
+  return { ...current, napAt: current.sleeping ? now + awakeDuration : now, sleeping: !current.sleeping };
+}
+
 const seed = {
+  focusMinutes: defaultFocusMinutes,
   pet: { health: 5, food: 3, happiness: 4, apples: 1 },
   tasks: [
     { id: 'draft', date: today, title: 'Finish project draft', priority: 'High', importance: 'Important', minutes: 60, sessions: 0, done: false, carried: true },
@@ -69,13 +95,16 @@ const seed = {
 export function readData() {
   try {
     const data = { ...seed, ...JSON.parse(localStorage.getItem(storageKey)) };
-    data.pet = updateHunger(data.pet);
+    data.pet = updatePet(data.pet);
+    if (!Number.isInteger(data.focusMinutes) || data.focusMinutes < 1 || data.focusMinutes > maxFocusMinutes) {
+      data.focusMinutes = defaultFocusMinutes;
+    }
     if (data.rollover) {
       data.tasks = data.tasks.map((task) => !task.done && task.date < today ? { ...task, date: today, carried: true } : task);
     }
     return data;
   } catch {
-    return { ...seed, pet: updateHunger(seed.pet) };
+    return { ...seed, pet: updatePet(seed.pet) };
   }
 }
 
@@ -85,35 +114,4 @@ export function saveData(data) {
 
 export function comparePriority(a, b) {
   return priorities.indexOf(a.priority) - priorities.indexOf(b.priority);
-}
-
-export function makeSchedule(tasks, events, hours, shortFirst) {
-  const start = timeValue(hours.start);
-  const end = timeValue(hours.end);
-  const fixed = events.map((event) => ({
-    ...event, type: 'event', from: timeValue(event.start), to: timeValue(event.end),
-  }));
-  const ordered = [...tasks].sort((a, b) => Number(b.done) - Number(a.done)
-    || importance.indexOf(a.importance) - importance.indexOf(b.importance)
-    || comparePriority(a, b) || (shortFirst ? a.minutes - b.minutes : b.minutes - a.minutes));
-
-  const scheduled = [...fixed];
-  for (const task of ordered) {
-    let from = start;
-    const length = task.done ? task.minutes : Math.max(1, task.minutes - task.sessions * focusBlock);
-    for (const item of [...scheduled].sort((a, b) => a.from - b.from)) {
-      if (item.to <= from) continue;
-      if (from + length <= item.from) break;
-      from = item.to + (item.type === 'task' && !item.done ? 15 : 0);
-    }
-    if (from + length <= end) scheduled.push({ ...task, from, to: from + length, type: 'task' });
-  }
-
-  const rows = scheduled.sort((a, b) => a.from - b.from);
-  const withBreaks = rows.flatMap((row, index) => {
-    const next = rows[index + 1];
-    if (!next || (row.type === 'task' && row.done) || next.from - row.to < 15) return [row];
-    return [row, { id: 'break-' + row.id, title: 'Take a breather', type: 'break', from: row.to, to: row.to + 15 }];
-  });
-  return { rows: withBreaks, unscheduled: tasks.length - scheduled.filter((row) => row.type === 'task').length };
 }
