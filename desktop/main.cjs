@@ -1,12 +1,18 @@
-const { app, BrowserWindow, dialog, ipcMain, screen } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, Notification, powerMonitor, screen } = require('electron');
+const { createHash } = require('node:crypto');
 const { existsSync } = require('node:fs');
 const path = require('node:path');
+const { pathToFileURL } = require('node:url');
 const { createManagedBackend } = require('./managed-backend.cjs');
+const { createReminderScheduler } = require('./reminders.cjs');
 
 const rendererPath = path.join(__dirname, '../frontend/dist/index.html');
+const rendererUrl = pathToFileURL(rendererPath).href;
 const managed = app.isPackaged || process.argv.includes('--managed');
 let api = 'http://127.0.0.1:8080';
 let runtime;
+let reminders;
+const activeNotifications = new Set();
 let quitting = false;
 let backendReady = !managed;
 let startupStatus = 'Starting Pocket Pet…';
@@ -28,6 +34,12 @@ async function requestBackend(route, payload, timeout = 65000) {
 ipcMain.handle('pet:day-plan', async (_, request) => {
   const { data, status } = await requestBackend('/api/day-plans/suggest', request, 125000);
   return data ? { plan: data } : { status };
+});
+
+ipcMain.on('pet:sync-reminders', (event, entries) => {
+  if (event.senderFrame?.url === rendererUrl && event.senderFrame === event.sender.mainFrame) {
+    reminders?.replace(entries);
+  }
 });
 
 ipcMain.handle('pet:chat', async (_, message) => {
@@ -100,6 +112,26 @@ function showWindow() {
   window.focus();
 }
 
+function showReminder(reminder, start, key) {
+  const time = start.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  const notification = new Notification({
+    id: createHash('sha256').update(key).digest('hex'),
+    title: reminder.kind === 'calendar' ? 'Upcoming calendar event' : 'Next in your day plan',
+    body: reminder.title + ' · ' + time,
+  });
+  activeNotifications.add(notification);
+  notification.once('click', () => {
+    activeNotifications.delete(notification);
+    showWindow();
+  });
+  notification.once('close', () => activeNotifications.delete(notification));
+  notification.once('failed', (_, error) => {
+    activeNotifications.delete(notification);
+    console.warn('Could not show a Pocket Pet notification:', error);
+  });
+  notification.show();
+}
+
 async function launch() {
   showWindow();
   if (!managed) return;
@@ -142,9 +174,16 @@ if (managed && !app.requestSingleInstanceLock()) {
   app.on('before-quit', () => {
     quitting = true;
     runtime?.stop();
+    reminders?.stop();
   });
   app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') app.quit();
   });
-  void app.whenReady().then(launch);
+  void app.whenReady().then(() => {
+    if (process.platform === 'darwin' && Notification.isSupported()) {
+      reminders = createReminderScheduler(path.join(app.getPath('userData'), 'reminder-history.json'), showReminder);
+      powerMonitor.on('resume', reminders.check);
+    }
+    return launch();
+  });
 }

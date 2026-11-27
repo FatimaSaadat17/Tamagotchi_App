@@ -9,6 +9,7 @@ import Plan from './Plan';
 import { comparePriority, focusedMinutes, minutesLeft, offsetDate, readData, saveData, sessionsLeft, today, togglePetRest, updatePet } from './model';
 import { Avatar } from './ui';
 import { usePochitaChat } from './usePochitaChat';
+import { upcomingReminders } from './reminders';
 import './style.css';
 
 const tabs = ['Plan', 'Diary', 'Focus', 'Calendar'];
@@ -94,6 +95,9 @@ function App() {
     .reduce((sum, task) => sum + sessionsLeft(task, focusMinutes), 0);
 
   useEffect(() => { saveData(data); }, [data]);
+  useEffect(() => {
+    window.pet?.syncReminders?.(upcomingReminders(data.events, data.plans, data.tasks));
+  }, [data.events, data.plans, data.tasks]);
 
   useEffect(() => {
     const interval = setInterval(() => setData((current) => {

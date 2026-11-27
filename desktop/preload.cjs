@@ -6,4 +6,5 @@ contextBridge.exposeInMainWorld('pet', {
   chatHistory: (id) => ipcRenderer.invoke('pet:chat-history', id),
   sendChatMessage: (id, message) => ipcRenderer.invoke('pet:send-chat-message', id, message),
   dayPlan: (request) => ipcRenderer.invoke('pet:day-plan', request),
+  syncReminders: (reminders) => ipcRenderer.send('pet:sync-reminders', reminders),
 });

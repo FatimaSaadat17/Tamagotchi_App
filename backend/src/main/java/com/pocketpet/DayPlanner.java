@@ -78,23 +78,16 @@ class DayPlanner {
 
         List<Block> scheduled = new ArrayList<>(fixed);
         Map<String, Integer> plannedMinutes = new HashMap<>();
-<<<<<<< HEAD
-=======
         int workingStart = request.start();
         if (request.preference() != null && !request.preference().isBlank() && draft.startAfter() != null) {
             workingStart = Math.clamp(draft.startAfter(), request.start(), request.end());
         }
->>>>>>> week1
         Comparator<DraftBlock> tasksFirst = Comparator.comparing((DraftBlock block) -> block.type() != BlockType.TASK)
                 .thenComparing(DraftBlock::from);
         for (DraftBlock block : draft.blocks().stream()
                 .filter(item -> item != null && item.from() != null && item.to() != null)
                 .sorted(tasksFirst).toList()) {
-<<<<<<< HEAD
-            addSuggestion(block, request, tasks, scheduled, plannedMinutes);
-=======
             addSuggestion(block, request, workingStart, tasks, scheduled, plannedMinutes);
->>>>>>> week1
         }
 
         List<String> unscheduled = request.tasks().stream()
@@ -106,14 +99,9 @@ class DayPlanner {
         if (plannedMinutes.isEmpty()) highlights = List.of("Pochita left the focus tasks unscheduled.");
         else if (highlights.isEmpty()) highlights = List.of("Your focus blocks are ready to review.");
         scheduled.sort(BLOCK_ORDER);
-<<<<<<< HEAD
-        return new Plan(String.join(" · ", highlights), highlights,
-                splitIntoSessions(scheduled, request.focusMinutes()), unscheduled);
-=======
         List<Block> sessions = splitIntoSessions(scheduled, request.focusMinutes());
         alignOpening(sessions, workingStart, request.end());
         return new Plan(String.join(" · ", highlights), highlights, sessions, unscheduled);
->>>>>>> week1
     }
 
     private Map<String, PlanTask> indexTasks(List<PlanTask> tasks) {
@@ -151,15 +139,9 @@ class DayPlanner {
         return windows;
     }
 
-<<<<<<< HEAD
-    private void addSuggestion(DraftBlock block, PlanRequest request, Map<String, PlanTask> tasks,
-            List<Block> scheduled, Map<String, Integer> plannedMinutes) {
-        int from = Math.max(block.from(), request.start());
-=======
     private void addSuggestion(DraftBlock block, PlanRequest request, int workingStart, Map<String, PlanTask> tasks,
             List<Block> scheduled, Map<String, Integer> plannedMinutes) {
         int from = Math.max(block.from(), workingStart);
->>>>>>> week1
         int to = Math.min(block.to(), request.end());
         if (from >= to) return;
 
@@ -202,8 +184,6 @@ class DayPlanner {
         return sessions;
     }
 
-<<<<<<< HEAD
-=======
     private void alignOpening(List<Block> blocks, int workingStart, int workingEnd) {
         Block first = blocks.stream().filter(block -> block.type() == BlockType.TASK).findFirst().orElse(null);
         if (first == null || first.from() == workingStart) return;
@@ -231,7 +211,6 @@ class DayPlanner {
         blocks.sort(BLOCK_ORDER);
     }
 
->>>>>>> week1
     private String serialize(PlanRequest request, List<Window> available) {
         try {
             ObjectNode input = mapper.valueToTree(request);

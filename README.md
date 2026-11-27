@@ -39,7 +39,14 @@ For example, to install the version 0.1.0 Debian package from the folder that co
 sudo apt install ./pocket-pet_0.1.0_amd64.deb
 ```
 
-Local macOS builds may be unsigned. If macOS blocks a build you made yourself, follow Apple's instructions for opening a trusted app. [Safely open apps on your Mac](https://support.apple.com/en-us/102445)
+Local macOS builds use an ad-hoc signature when a Developer ID certificate is unavailable. This lets the installed app register for notifications on your Mac. If macOS blocks a build you made yourself, follow Apple's instructions for opening a trusted app. [Safely open apps on your Mac](https://support.apple.com/en-us/102445)
+
+### macOS reminders
+
+Install **Pocket Pet.app** in **Applications** and open it from there. Allow notifications when prompted, or open **System Settings → Notifications → Pocket Pet** to enable them. Keep Pocket Pet running to receive reminders when its window is closed. [macOS notification settings](https://support.apple.com/en-us/guide/mac-help/mh40583/mac)
+
+- Calendar events get reminders **30 minutes** and **15 minutes** before they start.
+- Focus and break blocks get a reminder **5 minutes** before they start after you click **Use this plan**. Calendar events already get their calendar reminders.
 
 ### 3. Let the first launch finish
 
